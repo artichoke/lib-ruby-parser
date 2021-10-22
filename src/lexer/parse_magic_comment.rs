@@ -3,6 +3,8 @@ use std::convert::TryInto;
 use crate::source::{MagicComment, MagicCommentKind};
 use crate::DiagnosticMessage;
 use crate::Lexer;
+crate::use_native_or_external!(String);
+crate::use_native_or_external!(Vec);
 
 type MagicCommentData = (&'static str, fn() -> MagicCommentKind);
 
@@ -309,12 +311,14 @@ impl Lexer<'_> {
             }
 
             n = end - beg;
-            name = String::from_utf8(
+            name = String::from_utf8(Vec::from_iter_in(
                 self.buffer
                     .substr_at(beg, beg + n)
                     .expect("failed to get magic comment name")
-                    .to_vec(),
-            )
+                    .iter()
+                    .cloned(),
+                self.bump,
+            ))
             .map_err(|_| ())?;
 
             let name_to_compare = name.replace("-", "_");
@@ -322,22 +326,21 @@ impl Lexer<'_> {
                 let kind = kind();
                 if &name_to_compare == name {
                     if kind.is_encoding() {
-                        let encoding = match String::from_utf8(
+                        let encoding = match String::from_utf8(Vec::from_iter_in(
                             self.buffer
                                 .substr_at(vbeg, vend)
                                 .expect("bug: Can't be None")
-                                .to_vec(),
-                        ) {
+                                .iter()
+                                .cloned(),
+                            self.bump,
+                        )) {
                             Ok(encoding) => encoding,
                             Err(err) => {
+                                let mut message =
+                                    String::from_str_in("unknown encoding name: ", self.bump);
+                                message.extend(err.utf8_error().to_string().chars());
                                 self.yyerror1(
-                                    DiagnosticMessage::new_encoding_error(
-                                        format!(
-                                            "unknown encoding name: {}",
-                                            String::from_utf8_lossy(err.as_bytes())
-                                        )
-                                        .into(),
-                                    ),
+                                    DiagnosticMessage::new_encoding_error(message),
                                     self.loc(vbeg, vend),
                                 );
 
@@ -348,7 +351,10 @@ impl Lexer<'_> {
                             Ok(_) => {}
                             Err(err) => {
                                 self.yyerror1(
-                                    DiagnosticMessage::new_encoding_error(err.to_string().into()),
+                                    DiagnosticMessage::new_encoding_error(String::from_str_in(
+                                        &err.to_string(),
+                                        self.bump,
+                                    )),
                                     self.loc(vbeg, vend),
                                 );
                                 return Err(());

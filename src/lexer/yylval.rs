@@ -1,17 +1,20 @@
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(Vec);
 use crate::lexer::*;
 use crate::Bytes;
 use crate::TokenBuf;
 
-impl Lexer<'_> {
+impl<'a> Lexer<'a> {
     pub(crate) fn set_yylval_id(&mut self, id: &str) {
         if cfg!(feature = "debug-lexer") {
             println!("set_yylval_id({})", id);
         }
-        self.lval = Some(Bytes::new(List::from(id)));
+        self.lval = Some(Bytes::new(
+            self.bump,
+            Vec::from_iter_in(id.as_bytes().iter().cloned(), self.bump),
+        ));
     }
 
-    pub(crate) fn set_yylval_literal(&mut self, value: &TokenBuf) {
+    pub(crate) fn set_yylval_literal(&mut self, value: &TokenBuf<'a>) {
         if cfg!(feature = "debug-lexer") {
             println!(
                 "set_yylval_literal({:#?}) ptok = {}, pcur = {}",
@@ -25,7 +28,7 @@ impl Lexer<'_> {
         if cfg!(feature = "debug-lexer") {
             println!("set_yylval_num {:#?}", flags);
         }
-        self.lval = Some(Bytes::new(List::from(flags)));
+        self.lval = Some(Bytes::new(Vec::from(flags)));
     }
 
     pub(crate) fn set_yylval_str(&mut self, value: &TokenBuf) {

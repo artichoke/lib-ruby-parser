@@ -5,6 +5,8 @@ use crate::str_term::{str_types::*, HeredocEnd, HeredocLiteral, StrTerm};
 use crate::Lexer;
 use crate::TokenBuf;
 use crate::{lex_states::*, DiagnosticMessage};
+crate::use_native_or_external!(Vec);
+crate::use_native_or_external!(String);
 
 const TAB_WIDTH: i32 = 8;
 
@@ -90,14 +92,14 @@ impl Lexer<'_> {
             .buffer
             .substr_at(self.buffer.ptok, self.buffer.pcur)
             .expect("failed to get heredoc id");
-        let id = TokenBuf::new(id);
+        let id = TokenBuf::new(self.bump, id);
         self.set_yylval_str(&id);
         self.lval_start = Some(self.buffer.ptok);
         self.lval_end = Some(self.buffer.pcur);
 
         self.buffer.goto_eol();
 
-        self.strterm = Some(Box::new(StrTerm::new_heredoc(HeredocLiteral::new(
+        self.strterm = Some(self.bump.alloc(StrTerm::new_heredoc(HeredocLiteral::new(
             self.buffer.lastline,
             offset,
             self.buffer.ruby_sourceline,
@@ -113,7 +115,7 @@ impl Lexer<'_> {
     }
 
     pub(crate) fn here_document(&mut self) -> i32 {
-        let here = match self.strterm.as_ref().unwrap().as_ref() {
+        let here = match self.strterm.as_ref().unwrap() {
             StrTerm::StringLiteral(_) => unreachable!("strterm must be heredoc"),
             StrTerm::HeredocLiteral(h) => h.clone(),
         };
@@ -126,7 +128,7 @@ impl Lexer<'_> {
         let mut ptr;
         let mut ptr_end;
         let len;
-        let mut str_ = TokenBuf::new(b"");
+        let mut str_ = TokenBuf::new(self.bump, b"");
         let bol;
 
         let heredoc_end: HeredocEnd;
@@ -308,22 +310,19 @@ impl Lexer<'_> {
         HeredocEnd {
             start,
             end,
-            value: value.to_vec(),
+            value: Vec::from_iter_in(value.iter().cloned(), self.bump),
         }
     }
 
     fn here_document_error(&mut self, here: &HeredocLiteral, eos: usize, len: usize) -> i32 {
         self.heredoc_restore(here);
         self.compile_error(
-            DiagnosticMessage::new_unterminated_heredoc(
-                String::from_utf8_lossy(
-                    self.buffer
-                        .substr_at(eos, eos + len)
-                        .expect("failed to get heredoc id for comparison"),
-                )
-                .into_owned()
-                .into(),
-            ),
+            DiagnosticMessage::new_unterminated_heredoc(String::from_utf8_lossy_in(
+                self.buffer
+                    .substr_at(eos, eos + len)
+                    .expect("failed to get heredoc id for comparison"),
+                self.bump,
+            )),
             self.current_loc(),
         );
         self.token_flush();
@@ -336,7 +335,7 @@ impl Lexer<'_> {
         let heredoc_end = self.compute_heredoc_end();
         self.lval_start = Some(heredoc_end.start);
         self.lval_end = Some(heredoc_end.end);
-        self.set_yylval_str(&TokenBuf::new(&heredoc_end.value));
+        self.set_yylval_str(&TokenBuf::new(self.bump, &heredoc_end.value));
 
         self.heredoc_restore(here);
         self.token_flush();

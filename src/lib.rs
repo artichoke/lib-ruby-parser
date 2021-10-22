@@ -21,11 +21,11 @@ pub use loc::Loc;
 /// like `Comment`, `Input`, `Decoder`
 pub mod source;
 
-// #[allow(clippy::collapsible_if)]
-// #[allow(clippy::collapsible_else_if)]
-// mod lexer;
+#[allow(clippy::collapsible_if)]
+#[allow(clippy::collapsible_else_if)]
+mod lexer;
 
-// pub use lexer::Lexer;
+pub use lexer::Lexer;
 
 mod static_environment;
 pub use static_environment::StaticEnvironment;
@@ -94,9 +94,9 @@ pub use bytes::Bytes;
 pub mod containers;
 pub(crate) use containers::use_native_or_external;
 
-// /// Module with blobs, based on provided sizes
-// #[cfg(feature = "compile-with-external-structures")]
-// pub mod blobs;
+/// Module with blobs, based on provided sizes
+#[cfg(feature = "compile-with-external-structures")]
+pub mod blobs;
 
-// #[cfg(test)]
-// pub(crate) mod test_helpers;
+#[cfg(test)]
+pub(crate) mod test_helpers;

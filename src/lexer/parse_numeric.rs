@@ -380,7 +380,7 @@ impl Lexer<'_> {
         if self.buffer.peek(b'_') {
             self.nextc();
         }
-        self.set_integer_literal(&mut TokenBuf::new(b"0"), 0)
+        self.set_integer_literal(&mut TokenBuf::new(self.bump, b"0"), 0)
     }
 
     fn number_literal_suffix(&mut self, mask: i8) -> i8 {

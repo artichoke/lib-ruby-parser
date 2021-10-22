@@ -53,6 +53,13 @@ impl<'a> TokenBuf<'a> {
     pub(crate) fn clear(&mut self) {
         self.bytes.clear()
     }
+
+    pub(crate) fn default(bump: &'a Bump) -> Self {
+        Self {
+            bump,
+            bytes: Bytes::new(bump, Vec::new_in(bump)),
+        }
+    }
 }
 
 impl PartialEq<str> for TokenBuf<'_> {

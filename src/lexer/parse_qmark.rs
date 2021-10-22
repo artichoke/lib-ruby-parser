@@ -1,8 +1,11 @@
+use std::str::FromStr;
+
 use crate::lex_states::*;
 use crate::lexer::*;
 use crate::maybe_byte::*;
 use crate::source::buffer::*;
 use crate::DiagnosticMessage;
+crate::use_native_or_external!(String);
 
 impl Lexer<'_> {
     fn parse_qmark_ternary(&mut self, c: MaybeByte) -> Result<i32, ()> {
@@ -61,11 +64,10 @@ impl Lexer<'_> {
                     }
                 }
                 self.warn(
-                    DiagnosticMessage::new_ambiguous_ternary_operator(
-                        String::from_utf8_lossy(self.buffer.substr_at(start, ptr).unwrap())
-                            .into_owned()
-                            .into(),
-                    ),
+                    DiagnosticMessage::new_ambiguous_ternary_operator(String::from_utf8_lossy_in(
+                        self.buffer.substr_at(start, ptr).unwrap(),
+                        self.bump,
+                    )),
                     self.loc(start - 1, start),
                 )
             }

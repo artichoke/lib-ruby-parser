@@ -1,7 +1,10 @@
 crate::use_native_or_external!(Ptr);
-crate::use_native_or_external!(StringPtr);
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(String);
+crate::use_native_or_external!(Vec);
 crate::use_native_or_external!(Maybe);
+
+use bumpalo::collections::FromIteratorIn;
+use bumpalo::Bump;
 
 use crate::lexer::*;
 use crate::maybe_byte::*;
@@ -22,7 +25,7 @@ use crate::{Diagnostic, DiagnosticMessage, ErrorLevel};
 
 /// A struct responsible for converting a given input
 /// into a sequence of tokens
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Lexer<'a> {
     pub(crate) bump: &'a bumpalo::Bump,
 
@@ -32,7 +35,7 @@ pub struct Lexer<'a> {
     pub(crate) lval_start: Option<usize>,
     pub(crate) lval_end: Option<usize>,
 
-    pub(crate) strterm: Option<&'a StrTerm>,
+    pub(crate) strterm: Option<&'a StrTerm<'a>>,
     /// Current state of the lexer, used internally for testing
     pub lex_state: LexState,
     pub(crate) paren_nest: i32,
@@ -82,9 +85,9 @@ pub struct Lexer<'a> {
     /// ```
     pub static_env: StaticEnvironment,
 
-    pub(crate) diagnostics: Diagnostics,
-    pub(crate) comments: bumpalo::collections::Vec<'a, Comment>,
-    pub(crate) magic_comments: bumpalo::collections::Vec<'a, MagicComment>,
+    pub(crate) diagnostics: Diagnostics<'a>,
+    pub(crate) comments: Vec<'a, Comment>,
+    pub(crate) magic_comments: Vec<'a, MagicComment>,
 }
 
 impl<'a> Lexer<'a> {
@@ -95,17 +98,38 @@ impl<'a> Lexer<'a> {
     pub(crate) const VTAB_CHAR: u8 = 0x0b;
 
     /// Constructs an instance of Lexer
-    pub fn new<Bytes, Name>(bytes: Bytes, name: Name, decoder: Maybe<Decoder>) -> Self
+    pub fn new<Bytes, Name>(
+        bump: &'a Bump,
+        bytes: Bytes,
+        name: Name,
+        decoder: Maybe<Decoder<'a>>,
+    ) -> Self
     where
-        Bytes: Into<List<'a, u8>>,
-        Name: Into<StringPtr>,
+        Bytes: Into<Vec<'a, u8>>,
+        Name: Into<String<'a>>,
     {
         Self {
+            bump,
             cond: StackState::new("cond"),
             cmdarg: StackState::new("cmdarg"),
             lpar_beg: -1, /* make lambda_beginning_p() == FALSE at first */
-            buffer: Buffer::new(name.into(), bytes.into(), decoder),
-            ..Self::default()
+            buffer: Buffer::new(bump, name.into(), bytes.into(), decoder),
+            lval: None,
+            lval_start: None,
+            lval_end: None,
+            strterm: None,
+            lex_state: LexState::default(),
+            paren_nest: 0,
+            brace_nest: 0,
+            tokenbuf: TokenBuf::default(bump),
+            context: Context::default(),
+            in_kwarg: false,
+            command_start: false,
+            token_seen: false,
+            static_env: StaticEnvironment::default(),
+            diagnostics: Diagnostics::new(bump),
+            comments: Vec::new_in(bump),
+            magic_comments: Vec::new_in(bump),
         }
     }
 
@@ -116,11 +140,11 @@ impl<'a> Lexer<'a> {
     /// of tokens. It's used internally to test simple inputs.
     ///
     /// If you need to get tokens better use `ParserResult::tokens` field
-    pub fn tokenize_until_eof(&mut self) -> Vec<Token> {
-        let mut tokens = vec![];
+    pub fn tokenize_until_eof(&mut self) -> Vec<'a, &'a Token> {
+        let mut tokens = Vec::new_in(self.bump);
 
         loop {
-            let token = self.yylex().unptr();
+            let token = self.yylex();
             match token.token_type() {
                 Self::END_OF_INPUT => break,
                 _ => tokens.push(token),
@@ -146,16 +170,17 @@ impl<'a> Lexer<'a> {
                 // take raw value if nothing was manually captured
                 self.buffer
                     .substr_at(begin, end)
-                    .map(|s| Bytes::new(List::from(s)))
+                    .map(|s| Bytes::new(self.bump, Vec::from_iter_in(s.iter().cloned(), self.bump)))
             })
-            .unwrap_or_else(|| Bytes::new(list![]));
+            .unwrap_or_else(|| Bytes::new(self.bump, bump_vec![in self.bump; ]));
 
         if token_type == Self::tNL {
-            token_value = Bytes::new(list![b'\n']);
+            token_value = Bytes::new(self.bump, bump_vec![in self.bump; b'\n']);
             end = begin + 1;
         }
 
         let token = self.bump.alloc(Token::new(
+            self.bump,
             token_type,
             token_value,
             Loc::new(begin, end),
@@ -191,7 +216,7 @@ impl<'a> Lexer<'a> {
         let mut last_state: LexState;
         let token_seen = self.token_seen;
 
-        if let Some(strterm) = self.strterm.as_ref().map(|i| i.as_ref()) {
+        if let Some(strterm) = self.strterm.as_ref().map(|i| *i) {
             match strterm {
                 StrTerm::HeredocLiteral(_) => {
                     return self.here_document();
@@ -1101,7 +1126,7 @@ impl<'a> Lexer<'a> {
         Self::tNL
     }
 
-    pub(crate) fn warn(&mut self, message: DiagnosticMessage, loc: Loc) {
+    pub(crate) fn warn(&mut self, message: DiagnosticMessage<'a>, loc: Loc) {
         if cfg!(feature = "debug-lexer") {
             println!("WARNING: {}", message.render())
         }
@@ -1122,14 +1147,17 @@ impl<'a> Lexer<'a> {
             && space_seen & !c.is_space()
         {
             self.warn(
-                DiagnosticMessage::new_ambiguous_operator(op.into(), syn.into()),
+                DiagnosticMessage::new_ambiguous_operator(
+                    String::from_str_in(op, self.bump),
+                    String::from_str_in(syn, self.bump),
+                ),
                 self.current_loc(),
             );
         }
         token_type
     }
 
-    pub(crate) fn compile_error(&mut self, message: DiagnosticMessage, loc: Loc) {
+    pub(crate) fn compile_error(&mut self, message: DiagnosticMessage<'a>, loc: Loc) {
         if cfg!(feature = "debug-lexer") {
             println!("Compile error: {}", message.render())
         }
@@ -1142,9 +1170,9 @@ impl<'a> Lexer<'a> {
         func: usize,
         term: u8,
         paren: Option<u8>,
-        heredoc_end: Option<HeredocEnd>,
-    ) -> Option<Box<StrTerm>> {
-        Some(Box::new(StrTerm::new_literal(StringLiteral::new(
+        heredoc_end: Option<HeredocEnd<'a>>,
+    ) -> Option<&'a StrTerm> {
+        Some(self.bump.alloc(StrTerm::new_literal(StringLiteral::new(
             0,
             func,
             paren,
@@ -1182,7 +1210,7 @@ impl<'a> Lexer<'a> {
         self.yyerror1(message, self.current_loc());
     }
 
-    pub(crate) fn yyerror1(&mut self, message: DiagnosticMessage, loc: Loc) {
+    pub(crate) fn yyerror1(&mut self, message: DiagnosticMessage<'a>, loc: Loc) {
         if cfg!(feature = "debug-lexer") {
             println!("yyerror0: {}", message.render())
         }
@@ -1213,7 +1241,7 @@ impl<'a> Lexer<'a> {
     pub(crate) fn newtok(&mut self) {
         self.buffer.tokidx = 0;
         self.buffer.tokline = self.buffer.ruby_sourceline;
-        self.tokenbuf = TokenBuf::default();
+        self.tokenbuf = TokenBuf::default(self.bump);
     }
 
     pub(crate) fn literal_flush(&mut self, ptok: usize) {

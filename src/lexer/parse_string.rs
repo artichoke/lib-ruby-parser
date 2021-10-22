@@ -6,19 +6,21 @@ use crate::str_term::{str_types::*, StrTerm};
 use crate::TokenBuf;
 use crate::{lex_states::*, DiagnosticMessage};
 use crate::{lexer::*, str_term::StringLiteral};
+crate::use_native_or_external!(String);
+crate::use_native_or_external!(Vec);
 
 const ESCAPE_CONTROL: usize = 1;
 const ESCAPE_META: usize = 2;
 
-impl Lexer<'_> {
+impl<'a> Lexer<'a> {
     fn take_strterm(&mut self) -> StringLiteral {
         match self.strterm.take().map(|v| *v) {
             Some(StrTerm::StringLiteral(s)) => s,
             _ => unreachable!("strterm must be string"),
         }
     }
-    fn restore_strterm(&mut self, literal: StringLiteral) {
-        self.strterm = Some(Box::new(StrTerm::StringLiteral(literal)));
+    fn restore_strterm(&mut self, literal: StringLiteral<'a>) {
+        self.strterm = Some(self.bump.alloc(StrTerm::StringLiteral(literal)));
     }
 
     pub(crate) fn parse_string(&mut self) -> i32 {
@@ -50,7 +52,7 @@ impl Lexer<'_> {
                 if let Some(heredoc_end) = quote.heredoc_end {
                     self.lval_start = Some(heredoc_end.start);
                     self.lval_end = Some(heredoc_end.end);
-                    self.set_yylval_str(&TokenBuf::new(&heredoc_end.value));
+                    self.set_yylval_str(&TokenBuf::new(self.bump, &heredoc_end.value));
                 }
                 return Self::tSTRING_END;
             }
@@ -170,11 +172,16 @@ impl Lexer<'_> {
             self.tokfix();
             self.compile_error(
                 DiagnosticMessage::new_unknown_regex_options(
-                    self.tokenbuf
-                        .borrow_string()
-                        .expect("expected buffer to have only utf-8 chars")
-                        .to_string()
-                        .into(),
+                    String::from_utf8(Vec::from_iter_in(
+                        self.tokenbuf
+                            .borrow_string()
+                            .unwrap()
+                            .as_bytes()
+                            .iter()
+                            .cloned(),
+                        self.bump,
+                    ))
+                    .expect("expected buffer to have only utf-8 chars"),
                 ),
                 self.current_loc(),
             );

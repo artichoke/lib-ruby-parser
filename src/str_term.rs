@@ -1,3 +1,7 @@
+use bumpalo::Bump;
+
+crate::use_native_or_external!(Vec);
+
 pub(crate) mod str_types {
     pub(crate) const STR_FUNC_ESCAPE: usize = 0x01;
     pub(crate) const STR_FUNC_EXPAND: usize = 0x02;
@@ -29,30 +33,40 @@ pub(crate) mod str_types {
     pub(crate) const str_dsym: usize = STR_FUNC_SYMBOL | STR_FUNC_EXPAND;
 }
 
-#[derive(Debug, Clone, Default)]
-pub(crate) struct HeredocEnd {
+#[derive(Debug, Clone)]
+pub(crate) struct HeredocEnd<'a> {
     pub(crate) start: usize,
     pub(crate) end: usize,
-    pub(crate) value: Vec<u8>,
+    pub(crate) value: Vec<'a, u8>,
+}
+
+impl<'a> HeredocEnd<'a> {
+    pub(crate) fn default(bump: &'a Bump) -> Self {
+        Self {
+            start: 0,
+            end: 0,
+            value: Vec::new_in(bump),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct StringLiteral {
+pub(crate) struct StringLiteral<'a> {
     // struct rb_strterm_literal_struct
     pub(crate) nest: usize,
     pub(crate) func: usize,
     pub(crate) paren: Option<u8>,
     pub(crate) term: u8,
-    pub(crate) heredoc_end: Option<HeredocEnd>,
+    pub(crate) heredoc_end: Option<HeredocEnd<'a>>,
 }
 
-impl StringLiteral {
+impl<'a> StringLiteral<'a> {
     pub(crate) fn new(
         nest: usize,
         func: usize,
         paren: Option<u8>,
         term: u8,
-        heredoc_end: Option<HeredocEnd>,
+        heredoc_end: Option<HeredocEnd<'a>>,
     ) -> Self {
         Self {
             nest,
@@ -96,14 +110,14 @@ impl HeredocLiteral {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum StrTerm {
+pub(crate) enum StrTerm<'a> {
     // struct rb_strterm_struct
-    StringLiteral(StringLiteral),
+    StringLiteral(StringLiteral<'a>),
     HeredocLiteral(HeredocLiteral),
 }
 
-impl StrTerm {
-    pub(crate) fn new_literal(literal: StringLiteral) -> Self {
+impl<'a> StrTerm<'a> {
+    pub(crate) fn new_literal(literal: StringLiteral<'a>) -> Self {
         Self::StringLiteral(literal)
     }
 
