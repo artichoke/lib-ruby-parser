@@ -1,10 +1,19 @@
 crate::use_native_or_external!(Maybe);
+crate::use_native_or_external!(String);
+
+use bumpalo::Bump;
 
 use crate::traverse::finder::Finder;
 use crate::{Parser, ParserOptions};
 
-fn find(src: &str, pattern: &str) -> Option<String> {
-    let options = ParserOptions::new("(find_test)".into(), Maybe::none(), Maybe::none(), false);
+fn find(src: &str, pattern: &str) -> Option<std::string::String> {
+    let bump = Bump::new();
+    let options = ParserOptions::new(
+        String::from_str_in("(find_test)", &bump),
+        Maybe::none(),
+        Maybe::none(),
+        false,
+    );
     let parser = Parser::new(src, options);
 
     let result = parser.do_parse();

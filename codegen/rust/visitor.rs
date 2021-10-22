@@ -8,28 +8,28 @@ use crate::Node;
 
 /// Trait that must be implement to observe actions
 /// that are performed by `Visitor` while it traverses given `Node`.
-pub trait Observer {
+pub trait Observer<'a> {
 {{ each node }}<dnl>
     /// Invoked by a `Visitor` on entering into `{{ helper node-rust-camelcase-name }}` node.
     #[allow(unused_variables)]
-    fn on_{{ helper node-lower-name }}(&mut self, node: &{{ helper node-rust-camelcase-name }}) {}
+    fn on_{{ helper node-lower-name }}(&mut self, node: &'a {{ helper node-rust-camelcase-name }}) {}
 {{ end }}
 
     /// Caled when entering any `Node`
     #[allow(unused_variables)]
-    fn on_node(&mut self, node: &Node) {}
+    fn on_node(&mut self, node: &'a Node<'a>) {}
 
     /// Called when exiting any `Node`
     #[allow(unused_variables)]
-    fn on_node_moving_up(&mut self, node: &Node) {}
+    fn on_node_moving_up(&mut self, node: &'a Node<'a>) {}
 
     /// Called when entering any optional `Node`
     #[allow(unused_variables)]
-    fn on_option_node(&mut self, node: &Option<Box<Node>>) {}
+    fn on_option_node(&mut self, node: &Option<&'a Node<'a>>) {}
 
     /// Called when entering any `Vec<Node>`
     #[allow(unused_variables)]
-    fn on_node_list(&mut self, nodes: &[Node]) {}
+    fn on_node_list(&mut self, nodes: &'a [&'a Node<'a>]) {}
 
     /// Called when entering any AST node,
     /// `subitem` is different for different `Node` fields,
@@ -44,8 +44,11 @@ pub trait Observer {
     fn on_subitem_moving_up(&mut self, subitem: Item) {}
 }
 
-impl<TObserver: Observer> Visit<Node> for Visitor<TObserver> {
-    fn visit(&mut self, node: &Node, visit_as: Item) {
+impl<'a, TObserver: Observer<'a>> Visit<&'a Node<'a>> for Visitor<TObserver>
+where
+    Self: 'a
+{
+    fn visit(&mut self, node: &'a Node<'a>, visit_as: Item) {
         self.observer.on_subitem(visit_as);
         self.observer.on_node(node);
 
@@ -60,12 +63,12 @@ impl<TObserver: Observer> Visit<Node> for Visitor<TObserver> {
     }
 }
 
-impl<T> Visitor<T>
+impl<'a, T> Visitor<T>
 where
-    T: Observer,
+    T: Observer<'a> + 'a,
 {
 {{ each node }}<dnl>
-    fn visit_{{ helper node-lower-name }}(&mut self, node: &{{ helper node-rust-camelcase-name }}) {
+    fn visit_{{ helper node-lower-name }}(&mut self, node: &'a {{ helper node-rust-camelcase-name }}) {
         self.observer.on_{{ helper node-lower-name }}(node);
 
 {{ each node-field }}<dnl>

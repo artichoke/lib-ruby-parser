@@ -8,7 +8,7 @@ use crate::Node;
 
 crate::use_native_or_external!(Ptr);
 crate::use_native_or_external!(Maybe);
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(Vec);
 
 /// Generic visitor of `Node`.
 ///
@@ -39,10 +39,7 @@ crate::use_native_or_external!(List);
 /// // => [Int { value: "2" }, Int { value: "3" }]
 /// ```
 #[derive(Debug)]
-pub struct Visitor<T>
-where
-    T: Observer,
-{
+pub struct Visitor<T> {
     /// Observer of the visitor, receives calls like `on_int(&mut self, node: nodes::Int)`
     pub observer: T,
 }
@@ -51,47 +48,50 @@ pub(crate) trait Visit<TItem> {
     fn visit(&mut self, item: TItem, visit_as: Item);
 }
 
-impl<'a, TObserver: Observer> Visit<&'a [&'a Node<'a>]> for Visitor<TObserver> {
+impl<'a, TObserver: Observer<'a>> Visit<&'a [&'a Node<'a>]> for Visitor<TObserver>
+where
+    Self: 'a,
+{
     fn visit(&mut self, nodes: &'a [&'a Node<'a>], visit_as: Item) {
         self.observer.on_subitem(visit_as);
         self.observer.on_node_list(nodes);
 
         for (idx, node) in nodes.iter().enumerate() {
-            self.visit(node, Item::Idx(idx));
+            self.visit(*node, Item::Idx(idx));
         }
 
         self.observer.on_subitem_moving_up(visit_as);
     }
 }
 
-impl<'a, TObserver: Observer> Visit<&'a List<'a, &'a Node<'a>>> for Visitor<TObserver> {
-    fn visit(&mut self, nodes: &'a List<'a, &'a Node<'a>>, visit_as: Item) {
-        let nodes: &[Node] = nodes;
+impl<'a, TObserver: Observer<'a>> Visit<&'a Vec<'a, &'a Node<'a>>> for Visitor<TObserver>
+where
+    Self: 'a,
+{
+    fn visit(&mut self, nodes: &'a Vec<'a, &'a Node<'a>>, visit_as: Item) {
+        let nodes: &'a [&'a Node<'a>] = nodes.as_slice();
         self.visit(nodes, visit_as);
     }
 }
 
-// impl<'a, TObserver: Observer> Visit<&'a Node<'a>> for Visitor<TObserver> {
-//     fn visit(&mut self, node: &'a Node<'a>, visit_as: Item) {
-//         let node: &Node = &*node;
-//         self.visit(node, visit_as);
-//     }
-// }
-
-impl<'a, TObserver: Observer> Visit<&Maybe<&'a Node<'a>>> for Visitor<TObserver> {
-    fn visit(&mut self, node: &Maybe<&'a Node<'a>>, visit_as: Item) {
-        if let Some(node) = node.as_ref() {
-            self.visit(node, visit_as);
+impl<'a, TObserver: Observer<'a>> Visit<&Maybe<&'a Node<'_>>> for Visitor<TObserver>
+where
+    Self: 'a,
+{
+    fn visit(&mut self, node: &Maybe<&'a Node>, visit_as: Item) {
+        if let Some(node) = node {
+            self.visit(*node, visit_as);
         }
     }
 }
 
-impl<T> Visitor<T>
+impl<'a, T> Visitor<T>
 where
-    T: Observer,
+    T: Observer<'a>,
+    Self: 'a,
 {
     /// Starts traversing on a given `node`
-    pub fn visit_root(&mut self, node: &Node) {
+    pub fn visit_root(&mut self, node: &'a Node<'a>) {
         self.visit(node, Item::Root);
     }
 }

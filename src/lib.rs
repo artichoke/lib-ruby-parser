@@ -81,8 +81,8 @@ pub(crate) use context::{Context, ContextItem};
 pub mod nodes;
 pub use nodes::Node;
 
-// /// Module to perform recursive traversing
-// pub mod traverse;
+/// Module to perform recursive traversing
+pub mod traverse;
 
 mod token;
 pub use token::Token;

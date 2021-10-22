@@ -30,8 +30,8 @@ impl<'a> Finder<'a> {
     }
 }
 
-impl<'a> Observer for Finder<'a> {
-    fn on_node(&mut self, node: &'a Node) {
+impl<'a> Observer<'a> for Finder<'a> {
+    fn on_node(&mut self, node: &'a Node<'a>) {
         if self.current_path == self.looking_for {
             self.result = Some(node);
         }
