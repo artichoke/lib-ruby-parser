@@ -1,14 +1,15 @@
 use super::Token;
-use crate::parser::token_name;
+// use crate::parser::token_name;
 
-crate::use_native_or_external!(List);
-crate::use_native_or_external!(StringPtr);
+crate::use_native_or_external!(Vec);
+crate::use_native_or_external!(String);
 
-impl std::fmt::Debug for Token {
+impl std::fmt::Debug for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!(
             "[{}, {:?}, {}...{}]",
-            self.token_name(),
+            "foo",
+            // self.token_name(),
             self.token_value().to_string_lossy(),
             self.loc().begin(),
             self.loc().end(),
@@ -16,14 +17,14 @@ impl std::fmt::Debug for Token {
     }
 }
 
-impl Token {
+impl<'a> Token<'a> {
     /// Returns a byte array of the token value
-    pub fn as_bytes(&self) -> &List<u8> {
+    pub fn as_bytes(&self) -> &Vec<'a, u8> {
         self.token_value().as_raw()
     }
 
     /// Consumes a token and returns an owned byte array of the token value
-    pub fn into_bytes(self) -> List<u8> {
+    pub fn into_bytes(self) -> Vec<'a, u8> {
         self.into_token_value().into_raw()
     }
 
@@ -33,22 +34,25 @@ impl Token {
     }
 
     /// Converts token to a string, replaces unknown chars to `U+FFFD`
-    pub fn to_string_lossy(&self) -> StringPtr {
+    pub fn to_string_lossy(&self) -> std::string::String {
         self.token_value().to_string_lossy()
     }
 
     /// Converts token to a string
-    pub fn to_string(&self) -> Result<StringPtr, std::string::FromUtf8Error> {
+    pub fn to_string(&self) -> Result<String, bumpalo::collections::string::FromUtf8Error> {
         self.token_value().to_string()
     }
 
     /// Consumes a token and converts it into a string
-    pub fn into_string(self) -> Result<StringPtr, std::string::FromUtf8Error> {
+    pub fn into_string(
+        self,
+    ) -> Result<String<'a>, bumpalo::collections::string::FromUtf8Error<'a>> {
         self.into_token_value().into_string()
     }
 
     /// Returns name of the token
     pub fn token_name(&self) -> &'static str {
-        token_name(self.token_type())
+        // token_name(self.token_type())
+        todo!()
     }
 }

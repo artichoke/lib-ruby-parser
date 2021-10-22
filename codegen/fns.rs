@@ -47,12 +47,35 @@ pub(crate) mod nodes {
         }
     }
 
+    pub(crate) fn generic_lifetime(node: &Node) -> String {
+        if has_ref_fields(node) {
+            String::from("<'a>")
+        } else {
+            String::from("")
+        }
+    }
+
     pub(crate) fn is_last(node: &Node) -> bool {
         lib_ruby_parser_nodes::template::ALL_DATA
             .nodes
             .last()
             .unwrap()
             == node
+    }
+
+    pub(crate) fn has_ref_fields(node: &Node) -> bool {
+        for field in node.fields.0 {
+            use lib_ruby_parser_nodes::NodeFieldType::*;
+
+            match field.field_type {
+                Node | Nodes | MaybeNode { .. } | Str { .. } | MaybeStr { .. } | StringValue => {
+                    return true
+                }
+
+                _ => {}
+            }
+        }
+        false
     }
 }
 
@@ -230,14 +253,14 @@ pub(crate) mod node_fields {
         use lib_ruby_parser_nodes::NodeFieldType::*;
 
         match node_with_field.field.field_type {
-            Node => "Ptr<Node>",
-            Nodes => "List<Node>",
-            MaybeNode { .. } => "Maybe<Ptr<Node>>",
+            Node => "&'a Node<'a>",
+            Nodes => "Vec<'a, &'a Node<'a>>",
+            MaybeNode { .. } => "Maybe<&'a Node<'a>>",
             Loc => "Loc",
-            MaybeLoc => "Maybe<Loc>",
-            Str { .. } => "StringPtr",
-            MaybeStr { .. } => "Maybe<StringPtr>",
-            StringValue => "Bytes",
+            MaybeLoc => "Option<Loc>",
+            Str { .. } => "String<'a>",
+            MaybeStr { .. } => "Maybe<String<'a>>",
+            StringValue => "Bytes<'a>",
             U8 => "u8",
         }
         .to_string()
@@ -275,12 +298,33 @@ pub(crate) mod messages {
         message.render_comment("///", 0)
     }
 
+    pub(crate) fn generic_lifetime(message: &Message) -> String {
+        if has_ref_fields(message) {
+            String::from("<'a>")
+        } else {
+            String::from("")
+        }
+    }
+
     pub(crate) fn is_last(message: &Message) -> bool {
         lib_ruby_parser_nodes::template::ALL_DATA
             .messages
             .last()
             .unwrap()
             == message
+    }
+
+    pub(crate) fn has_ref_fields(message: &Message) -> bool {
+        for field in message.fields.0 {
+            use lib_ruby_parser_nodes::MessageFieldType::*;
+
+            match field.field_type {
+                Str => return true,
+
+                _ => {}
+            }
+        }
+        false
     }
 }
 
@@ -352,7 +396,7 @@ pub(crate) mod message_fields {
     pub(crate) fn rust_field_type(message_with_field: &MessageWithField) -> String {
         use lib_ruby_parser_nodes::MessageFieldType::*;
         match message_with_field.field.field_type {
-            Str => "StringPtr",
+            Str => "String<'a>",
             Byte => "u8",
         }
         .to_string()
@@ -391,7 +435,9 @@ pub(crate) fn build() -> TemplateFns {
     fns.register_helper("node-c-enum-variant-name", nodes::c_enum_variant_name);
     fns.register_helper("node-c-union-member-name", nodes::c_union_member_name);
     fns.register_helper("node-rust-camelcase-name", nodes::rust_camelcase_name);
+    fns.register_helper("node-generic-lifetime", nodes::generic_lifetime);
     fns.register_predicate("node-is-last", nodes::is_last);
+    fns.register_predicate("node-has-ref-fields", nodes::has_ref_fields);
 
     fns.register_helper("node-field-name", node_fields::name);
     fns.register_helper("node-field-comment", node_fields::comment);
@@ -417,8 +463,10 @@ pub(crate) fn build() -> TemplateFns {
     fns.register_helper("message-upper-name", messages::upper_name);
     fns.register_helper("message-lower-name", messages::lower_name);
     fns.register_helper("message-comment", messages::comment);
+    fns.register_helper("message-generic-lifetime", messages::generic_lifetime);
     fns.register_predicate("message-is-last", messages::is_last);
     fns.register_predicate("message-has-no-fields", messages::has_no_fields);
+    fns.register_predicate("message-has-ref-fields", messages::has_ref_fields);
 
     fns.register_helper("message-field-name", message_fields::name);
     fns.register_helper("mesage-field-comment", message_fields::comment);

@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
-crate::use_native_or_external!(StringPtr);
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(String);
+crate::use_native_or_external!(Vec);
 crate::use_native_or_external!(Maybe);
 
 use crate::maybe_byte::*;
@@ -9,9 +9,9 @@ use crate::source::input::Input;
 use crate::source::Decoder;
 use crate::source::InputError;
 
-#[derive(Debug, Default)]
-pub(crate) struct Buffer {
-    pub(crate) input: Input,
+#[derive(Debug)]
+pub(crate) struct Buffer<'a> {
+    pub(crate) input: Input<'a>,
 
     pub(crate) line_count: usize,
     pub(crate) prevline: Option<usize>, // index
@@ -41,18 +41,39 @@ pub(crate) struct Buffer {
     // pub(crate) ruby_sourcefile_string: Vec<char>,
 }
 
-impl Buffer {
+impl<'a> Buffer<'a> {
     const CTRL_Z_CHAR: u8 = 0x1a;
     const CTRL_D_CHAR: u8 = 0x04;
 
-    pub(crate) fn new(name: StringPtr, bytes: List<u8>, decoder: Maybe<Decoder>) -> Self {
-        let mut input = Input::new(name, decoder);
+    pub(crate) fn new(
+        bump: &'a bumpalo::Bump,
+        name: String<'a>,
+        bytes: Vec<'a, u8>,
+        decoder: Maybe<Decoder<'a>>,
+    ) -> Self {
+        let mut input = Input::new(bump, name, decoder);
 
         input.update_bytes(bytes);
 
         let mut this = Self {
             input,
-            ..Self::default()
+            line_count: 0,
+            prevline: None,
+            lastline: 0,
+            nextline: 0,
+            pbeg: 0,
+            pcur: 0,
+            pend: 0,
+            ptok: 0,
+            eofp: false,
+            cr_seen: false,
+            heredoc_end: 0,
+            heredoc_indent: 0,
+            heredoc_line_indent: 0,
+            tokidx: 0,
+            tokline: 0,
+            has_shebang: false,
+            ruby_sourceline: 0,
         };
 
         this.prepare();
@@ -332,7 +353,7 @@ pub(crate) trait Pushback<T> {
     fn pushback(&mut self, c: T);
 }
 
-impl Pushback<u8> for Buffer {
+impl Pushback<u8> for Buffer<'_> {
     fn pushback(&mut self, c: u8) {
         self.pcur -= 1;
         if self.pcur > self.pbeg
@@ -347,7 +368,7 @@ impl Pushback<u8> for Buffer {
     }
 }
 
-impl Pushback<Option<u8>> for Buffer {
+impl Pushback<Option<u8>> for Buffer<'_> {
     fn pushback(&mut self, c: Option<u8>) {
         if let Some(c) = c {
             self.pushback(c)
@@ -355,13 +376,13 @@ impl Pushback<Option<u8>> for Buffer {
     }
 }
 
-impl Pushback<MaybeByte> for Buffer {
+impl Pushback<MaybeByte> for Buffer<'_> {
     fn pushback(&mut self, c: MaybeByte) {
         self.pushback(c.as_option())
     }
 }
 
-impl Pushback<&mut MaybeByte> for Buffer {
+impl Pushback<&mut MaybeByte> for Buffer<'_> {
     fn pushback(&mut self, c: &mut MaybeByte) {
         self.pushback(c.as_option())
     }

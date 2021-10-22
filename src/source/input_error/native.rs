@@ -1,31 +1,33 @@
+crate::use_native_or_external!(String);
+
 /// An enum with all possible kinds of errors that can be returned
 /// from a decoder
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[repr(C)]
-pub enum InputError {
+pub enum InputError<'a> {
     /// Emitted when no custom decoder provided but input has custom encoding.
     ///
     /// You can return this error from your custom decoder if you don't support given encoding.
-    UnsupportedEncoding(String),
+    UnsupportedEncoding(String<'a>),
 
     /// Generic error that can be emitted from a custom decoder
-    DecodingError(String),
+    DecodingError(String<'a>),
 }
 
-impl InputError {
+impl<'a> InputError<'a> {
     /// Constructs UnupportedEncoding variant
-    pub fn new_unsupported_encoding(err: String) -> Self {
+    pub fn new_unsupported_encoding(err: String<'a>) -> Self {
         Self::UnsupportedEncoding(err)
     }
 
     /// Constructs DecodingError variant
-    pub fn new_decoding_error(err: String) -> Self {
+    pub fn new_decoding_error(err: String<'a>) -> Self {
         Self::DecodingError(err)
     }
 }
 
 #[cfg(test)]
-impl InputError {
+impl<'a> InputError<'a> {
     pub(crate) fn is_unsupported_encoding(&self) -> bool {
         matches!(self, Self::UnsupportedEncoding(_))
     }

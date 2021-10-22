@@ -53,9 +53,9 @@ impl LexStateAction {
 /// Output of the token rewriter
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[repr(C)]
-pub struct TokenRewriterResult {
+pub struct TokenRewriterResult<'a> {
     /// Rewritten token. Can be input token if no rewriting expected
-    pub rewritten_token: Box<Token>,
+    pub rewritten_token: &'a Token<'a>,
 
     /// Action to be applied on a token (keep or drop)
     pub token_action: RewriteAction,
@@ -64,36 +64,39 @@ pub struct TokenRewriterResult {
     pub lex_state_action: LexStateAction,
 }
 
-impl TokenRewriterResult {
-    pub(crate) fn into_internal(self) -> InternalTokenRewriterResult {
+impl<'a> TokenRewriterResult<'a> {
+    pub(crate) fn into_internal(
+        &'a self,
+        bump: &'a bumpalo::Bump,
+    ) -> &'a InternalTokenRewriterResult<'a> {
         let Self {
             rewritten_token,
             token_action,
             lex_state_action,
         } = self;
-        InternalTokenRewriterResult {
+        bump.alloc(InternalTokenRewriterResult {
             rewritten_token,
-            token_action,
-            lex_state_action,
-        }
+            token_action: token_action.clone(),
+            lex_state_action: lex_state_action.clone(),
+        })
     }
 }
 
 /// Token rewriter function
-pub type TokenRewriterFn = dyn Fn(Box<Token>, &[u8]) -> TokenRewriterResult;
+pub type TokenRewriterFn<'a> = dyn (Fn(&'a Token<'a>, &'a [u8]) -> TokenRewriterResult<'a>) + 'a;
 
 /// Token rewriter struct, can be used to rewrite tokens on the fly
-pub struct TokenRewriter {
-    f: Box<TokenRewriterFn>,
+pub struct TokenRewriter<'a> {
+    f: Box<TokenRewriterFn<'a>>,
 }
 
-impl TokenRewriter {
+impl<'a> TokenRewriter<'a> {
     /// Constructs a rewriter based on a given function
-    pub fn new(f: Box<TokenRewriterFn>) -> Self {
+    pub fn new(f: Box<TokenRewriterFn<'a>>) -> Self {
         Self { f }
     }
 
-    pub(crate) fn call(&self, token: Box<Token>, input: &[u8]) -> TokenRewriterResult {
+    pub(crate) fn call(&self, token: &'a Token<'a>, input: &'a [u8]) -> TokenRewriterResult<'a> {
         let f = &*self.f;
         f(token, input)
     }

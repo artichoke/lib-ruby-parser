@@ -1,13 +1,16 @@
 crate::use_native_or_external!(Maybe);
+crate::use_native_or_external!(String);
+
+use bumpalo::Bump;
 
 use super::ParserOptions;
 
 const DEFAULT_BUFFER_NAME: &str = "(eval)";
 
-impl Default for ParserOptions {
-    fn default() -> Self {
+impl<'a> ParserOptions<'a> {
+    fn default(bump: &'a Bump) -> Self {
         Self::new(
-            DEFAULT_BUFFER_NAME.to_string().into(),
+            String::from_str_in(DEFAULT_BUFFER_NAME, bump),
             Maybe::none(),
             Maybe::none(),
             true,

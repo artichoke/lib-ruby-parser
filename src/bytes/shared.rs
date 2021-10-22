@@ -1,12 +1,16 @@
-crate::use_native_or_external!(List);
-crate::use_native_or_external!(StringPtr);
+// crate::use_native_or_external!(List);
+// crate::use_native_or_external!(StringPtr);
+use bumpalo::{
+    collections::{String, Vec},
+    Bump,
+};
 
 use super::Bytes;
 
-impl Bytes {
+impl<'a> Bytes<'a> {
     /// Constructs an empty instance of `Bytes`
-    pub fn empty() -> Self {
-        Self::new(list![])
+    pub fn empty(bump: &'a Bump) -> Bytes<'a> {
+        Self::new(bump, Vec::new_in(bump))
     }
 
     /// Converts byte sequence to a string slice, returns error if there are invalid UTF-8 chars
@@ -15,18 +19,22 @@ impl Bytes {
     }
 
     /// Converts byte sequnce to a string, all invalid UTF-8 chars are converted into "replacement char"
-    pub fn to_string_lossy(&self) -> StringPtr {
-        String::from_utf8_lossy(self.as_raw()).into_owned().into()
+    pub fn to_string_lossy(&self) -> std::string::String {
+        std::string::String::from_utf8_lossy(self.as_raw()).into_owned()
+        // todo!()
     }
 
     /// Converts byte sequence to a String, returns error if there are invalid UTF-8 chars
-    pub fn to_string(&self) -> Result<StringPtr, std::string::FromUtf8Error> {
-        String::from_utf8(self.as_raw().to_vec()).map(|s| s.into())
+    pub fn to_string(&self) -> Result<String<'a>, bumpalo::collections::string::FromUtf8Error> {
+        // String::from_utf8(self.raw)
+        todo!()
     }
 
     /// Consumes itself and convrters it into a string, returns error if there are invalid UTF-8 chars
-    pub fn into_string(self) -> Result<StringPtr, std::string::FromUtf8Error> {
-        String::from_utf8(self.into_raw().into()).map(|s| s.into())
+    pub fn into_string(
+        self,
+    ) -> Result<String<'a>, bumpalo::collections::string::FromUtf8Error<'a>> {
+        String::from_utf8(self.raw)
     }
 
     /// Returns `true` if `self` represents a valid UTF-8 string
@@ -46,6 +54,6 @@ impl Bytes {
 
     /// Clears inner data
     pub fn clear(&mut self) {
-        self.set_raw(list![])
+        self.set_raw(Vec::new_in(self.bump))
     }
 }

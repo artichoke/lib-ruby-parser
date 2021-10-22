@@ -3,13 +3,14 @@
 %define api.parser.struct { Parser }
 %define api.value.type { Value }
 %define api.parser.check_debug { cfg!(feature = "debug-parser") }
+%define api.parser.generic {<'a /*'*/>}
 
 %define parse.error custom
 %define parse.trace
 
 %code parser_fields {
-    result: Maybe<Ptr<Node>>,
-    builder: Builder,
+    result: Maybe<&'a /*'*/ Node<'a /*'*/>>,
+    builder: Builder<'a /*'*/>,
     current_arg_stack: CurrentArgStack,
     /// Stack of sets of variables in current scopes.
     /// Each stack item represents locals in the scope.
@@ -42,9 +43,9 @@
     max_numparam_stack: MaxNumparamStack,
     pattern_variables: VariablesStack,
     pattern_hash_keys: VariablesStack,
-    tokens: List<Token>,
+    tokens: List<'a /*'*/, Token<'a /*'*/>>,
     diagnostics: Diagnostics,
-    token_rewriter: Maybe<TokenRewriter>,
+    token_rewriter: Maybe<TokenRewriter<'a /*'*/>>,
     record_tokens: bool,
 }
 
@@ -350,7 +351,7 @@ use crate::parser_options::InternalParserOptions;
                         self.current_arg_stack.push(None);
                         self.max_numparam_stack.push();
 
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   top_compstmt
                     {
@@ -359,7 +360,7 @@ use crate::parser_options::InternalParserOptions;
                             Some(node) => Maybe::some(Ptr::new(node)),
                             None => Maybe::none(),
                         };
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
 
                         self.current_arg_stack.pop();
                         self.max_numparam_stack.pop();
@@ -369,7 +370,7 @@ use crate::parser_options::InternalParserOptions;
     top_compstmt: top_stmts opt_terms
                     {
                         // TODO: run void_stmts
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.compstmt($<NodeList>1)
                         );
                     }
@@ -377,21 +378,21 @@ use crate::parser_options::InternalParserOptions;
 
        top_stmts: none
                     {
-                      $$ = Value::NodeList( Box::new(list![]) );
+                      $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | top_stmt
                     {
-                      $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                      $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | top_stmts terms top_stmt
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList( nodes );
+                        $$ = Value::new_node_list( nodes );
                     }
                 | error top_stmt
                     {
-                      $$ = Value::NodeList( Box::new(list![ $<Node>2 ]) );
+                      $$ = Value::new_node_list( Box::new(list![ $<Node>2 ]) );
                     }
                 ;
 
@@ -402,7 +403,7 @@ use crate::parser_options::InternalParserOptions;
                 | klBEGIN begin_block
                     {
                         let BeginBlock { begin_t, body, end_t } = $<BeginBlock>2;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.preexe($<Token>1, begin_t, body, end_t)
                         );
                     }
@@ -434,7 +435,7 @@ use crate::parser_options::InternalParserOptions;
                         let else_ = Some(( $<Token>3, $<MaybeBoxedNode>4 ));
                         let ensure = $<OptEnsure>5.map(|ensure| (ensure.ensure_t, ensure.body));
 
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.begin_body(
                                 compound_stmt,
                                 rescue_bodies,
@@ -451,7 +452,7 @@ use crate::parser_options::InternalParserOptions;
                         let rescue_bodies = $<NodeList>2;
                         let ensure = $<OptEnsure>3.map(|ensure| (ensure.ensure_t, ensure.body));
 
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.begin_body(
                                 compound_stmt,
                                 rescue_bodies,
@@ -465,7 +466,7 @@ use crate::parser_options::InternalParserOptions;
         compstmt: stmts opt_terms
                     {
                         // TODO: run void_stmts
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.compstmt($<NodeList>1)
                         );
                     }
@@ -473,21 +474,21 @@ use crate::parser_options::InternalParserOptions;
 
            stmts: none
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | stmt_or_begin
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | stmts terms stmt_or_begin
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | error
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 ;
 
@@ -501,24 +502,24 @@ use crate::parser_options::InternalParserOptions;
                     }
                   begin_block
                     {
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
                     }
                 ;
 
             stmt: kALIAS fitem
                     {
                         self.yylexer.lex_state.set(EXPR_FNAME|EXPR_FITEM);
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   fitem
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.alias($<Token>1, $<BoxedNode>2, $<BoxedNode>4)
                         );
                     }
                 | kALIAS tGVAR tGVAR
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.alias(
                                 $<Token>1,
                                 self.builder.gvar($<Token>2),
@@ -528,7 +529,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kALIAS tGVAR tBACK_REF
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.alias(
                                 $<Token>1,
                                 self.builder.gvar($<Token>2),
@@ -542,7 +543,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kUNDEF undef_list
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.undef_method(
                                 $<Token>1,
                                 $<NodeList>2
@@ -551,7 +552,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | stmt kIF_MOD expr_value
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.condition_mod(
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::none(),
@@ -562,7 +563,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | stmt kUNLESS_MOD expr_value
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.condition_mod(
                                 Maybe::none(),
                                 Maybe::some($<BoxedNode>1),
@@ -573,7 +574,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | stmt kWHILE_MOD expr_value
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.loop_mod(
                                 LoopType::While,
                                 $<BoxedNode>1,
@@ -584,7 +585,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | stmt kUNTIL_MOD expr_value
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.loop_mod(
                                 LoopType::Until,
                                 $<BoxedNode>1,
@@ -604,7 +605,7 @@ use crate::parser_options::InternalParserOptions;
                             Maybe::some($<BoxedNode>3)
                         );
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin_body(
                                 Maybe::some($<BoxedNode>1),
                                 Box::new( list![rescue_body.unptr()] ),
@@ -619,7 +620,7 @@ use crate::parser_options::InternalParserOptions;
                             self.warn(@1, DiagnosticMessage::new_end_in_method());
                         }
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.postexe(
                                 $<Token>1,
                                 $<Token>2,
@@ -637,7 +638,7 @@ use crate::parser_options::InternalParserOptions;
                         let command_call = $<BoxedNode>3;
                         self.value_expr(&command_call)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.multi_assign(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -654,7 +655,7 @@ use crate::parser_options::InternalParserOptions;
                         );
                         self.value_expr(&mrhs)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assign(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -683,7 +684,7 @@ use crate::parser_options::InternalParserOptions;
                             None,
                         ).expect("expected begin_body to return Maybe::some (compound_stmt was given)");
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.multi_assign(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -693,7 +694,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | mlhs tEQL mrhs_arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.multi_assign(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -709,7 +710,7 @@ use crate::parser_options::InternalParserOptions;
 
     command_asgn: lhs tEQL command_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assign(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -719,7 +720,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | var_lhs tOP_ASGN command_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -729,7 +730,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value tLBRACK2 opt_call_args rbracket tOP_ASGN command_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 self.builder.index(
                                     $<BoxedNode>1,
@@ -744,7 +745,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value call_op tIDENTIFIER tOP_ASGN command_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 self.builder.call_method(
                                     Maybe::some($<BoxedNode>1),
@@ -761,7 +762,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value call_op tCONSTANT tOP_ASGN command_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 self.builder.call_method(
                                     Maybe::some($<BoxedNode>1),
@@ -785,7 +786,7 @@ use crate::parser_options::InternalParserOptions;
                                 $<Token>3
                             )
                         );
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 const_,
                                 $<Token>4,
@@ -795,7 +796,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value tCOLON2 tIDENTIFIER tOP_ASGN command_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 self.builder.call_method(
                                     Maybe::some($<BoxedNode>1),
@@ -812,7 +813,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | backref tOP_ASGN command_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -826,7 +827,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let command_call = $<BoxedNode>1;
                         self.value_expr(&command_call)?;
-                        $$ = Value::Node(command_call);
+                        $$ = Value::new_node(command_call);
                     }
                 | command_call kRESCUE_MOD stmt
                     {
@@ -842,7 +843,7 @@ use crate::parser_options::InternalParserOptions;
                             Maybe::some($<BoxedNode>3)
                         );
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin_body(
                                 Maybe::some(command_call),
                                 Box::new( list![ rescue_body.unptr() ] ),
@@ -863,7 +864,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | expr kAND expr
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.logical_op(
                                 LogicalOp::And,
                                 $<BoxedNode>1,
@@ -874,7 +875,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | expr kOR expr
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.logical_op(
                                 LogicalOp::Or,
                                 $<BoxedNode>1,
@@ -885,7 +886,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kNOT opt_nl expr
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.not_op(
                                 $<Token>1,
                                 Maybe::none(),
@@ -896,7 +897,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tBANG command_call
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.not_op(
                                 $<Token>1,
                                 Maybe::none(),
@@ -908,7 +909,7 @@ use crate::parser_options::InternalParserOptions;
                 | arg tASSOC
                     {
                         let arg = match yystack.borrow_value_at(1) {
-                            Value::Node(node) => node,
+                            Value::new_node(node) => node,
                             other => unreachable!("expected Node, got {:?}", other)
                         };
                         self.value_expr(arg)?;
@@ -917,7 +918,7 @@ use crate::parser_options::InternalParserOptions;
                         self.yylexer.command_start = false;
                         self.pattern_variables.push();
 
-                        $<Bool>$ = Value::Bool(self.yylexer.in_kwarg);
+                        $<Bool>$ = Value::new_bool(self.yylexer.in_kwarg);
                         self.yylexer.in_kwarg = true;
                     }
                   p_expr
@@ -925,7 +926,7 @@ use crate::parser_options::InternalParserOptions;
                         self.pattern_variables.pop();
                         self.yylexer.in_kwarg = $<Bool>3;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.match_pattern(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -936,7 +937,7 @@ use crate::parser_options::InternalParserOptions;
                 | arg kIN
                     {
                         let arg = match yystack.borrow_value_at(1) {
-                            Value::Node(node) => node,
+                            Value::new_node(node) => node,
                             other => unreachable!("expected Node, got {:?}", other)
                         };
                         self.value_expr(arg)?;
@@ -945,7 +946,7 @@ use crate::parser_options::InternalParserOptions;
                         self.yylexer.command_start = false;
                         self.pattern_variables.push();
 
-                        $<Bool>$ = Value::Bool(self.yylexer.in_kwarg);
+                        $<Bool>$ = Value::new_bool(self.yylexer.in_kwarg);
                         self.yylexer.in_kwarg = true;
                     }
                   p_expr
@@ -953,7 +954,7 @@ use crate::parser_options::InternalParserOptions;
                         self.pattern_variables.pop();
                         self.yylexer.in_kwarg = $<Bool>3;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.match_pattern_p(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -994,7 +995,7 @@ use crate::parser_options::InternalParserOptions;
        defs_head: k_def singleton dot_or_colon
                     {
                         self.yylexer.lex_state.set(EXPR_FNAME);
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   def_name
                     {
@@ -1016,13 +1017,13 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let expr = $<BoxedNode>1;
                         self.value_expr(&expr)?;
-                        $$ = Value::Node(expr);
+                        $$ = Value::new_node(expr);
                     }
                 ;
 
    expr_value_do:   {
                         self.yylexer.cond.push(true);
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   expr_value do
                     {
@@ -1054,7 +1055,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | block_call call_op2 operation2 command_args
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
@@ -1070,7 +1071,7 @@ use crate::parser_options::InternalParserOptions;
  cmd_brace_block: tLBRACE_ARG
                     {
                         self.context.push_block();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   brace_body tRCURLY
                     {
@@ -1095,7 +1096,7 @@ use crate::parser_options::InternalParserOptions;
 
          command: fcall command_args       %prec tLOWEST
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::none(),
                                 Maybe::none(),
@@ -1118,7 +1119,7 @@ use crate::parser_options::InternalParserOptions;
                         );
                         let CmdBraceBlock { begin_t, args_type, body, end_t } = $<CmdBraceBlock>3;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.block(
                                 method_call,
                                 begin_t,
@@ -1130,7 +1131,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value call_op operation2 command_args %prec tLOWEST
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
@@ -1153,7 +1154,7 @@ use crate::parser_options::InternalParserOptions;
                         );
                         let CmdBraceBlock { begin_t, args_type, body, end_t } = $<CmdBraceBlock>5;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.block(
                                 method_call,
                                 begin_t,
@@ -1165,7 +1166,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value tCOLON2 operation2 command_args %prec tLOWEST
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
@@ -1188,7 +1189,7 @@ use crate::parser_options::InternalParserOptions;
                         );
                         let CmdBraceBlock { begin_t, args_type, body, end_t } = $<CmdBraceBlock>5;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.block(
                                 method_call,
                                 begin_t,
@@ -1200,7 +1201,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kSUPER command_args
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Super,
                                 $<Token>1,
@@ -1212,7 +1213,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kYIELD command_args
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Yield,
                                 $<Token>1,
@@ -1224,7 +1225,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | k_return call_args
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Return,
                                 $<Token>1,
@@ -1236,7 +1237,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kBREAK call_args
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Break,
                                 $<Token>1,
@@ -1248,7 +1249,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kNEXT call_args
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Next,
                                 $<Token>1,
@@ -1262,7 +1263,7 @@ use crate::parser_options::InternalParserOptions;
 
             mlhs: mlhs_basic
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.multi_lhs(
                                 Maybe::none(),
                                 $<NodeList>1,
@@ -1272,7 +1273,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tLPAREN mlhs_inner rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin(
                                 $<Token>1,
                                 Maybe::some($<BoxedNode>2),
@@ -1284,7 +1285,7 @@ use crate::parser_options::InternalParserOptions;
 
       mlhs_inner: mlhs_basic
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.multi_lhs(
                                 Maybe::none(),
                                 $<NodeList>1,
@@ -1301,7 +1302,7 @@ use crate::parser_options::InternalParserOptions;
                             unreachable!("unsupported mlhs item {:?}", mlhs_inner)
                         };
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.multi_lhs(
                                 Maybe::some($<Token>1),
                                 mlhs_items,
@@ -1319,13 +1320,13 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>2 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | mlhs_head tSTAR mlhs_node
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( self.builder.splat($<Token>2, Maybe::some($<BoxedNode>3)).unptr() );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | mlhs_head tSTAR mlhs_node tCOMMA mlhs_post
                     {
@@ -1334,16 +1335,16 @@ use crate::parser_options::InternalParserOptions;
                         let mut mlhs_post = $<NodeList>5;
 
                         nodes.reserve(1 + mlhs_post.len());
-                        nodes.push(mlhs_node.unptr());
+                        nodes.push(mlhs_node);
                         nodes.append(&mut mlhs_post);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | mlhs_head tSTAR
                     {
                         let mut nodes = $<NodeList>1;
-                        nodes.push( self.builder.splat($<Token>2, Maybe::none()).unptr() );
-                        $$ = Value::NodeList(nodes);
+                        nodes.push( self.builder.splat($<Token>2, Maybe::none()) );
+                        $$ = Value::new_node_list(nodes);
                     }
                 | mlhs_head tSTAR tCOMMA mlhs_post
                     {
@@ -1355,11 +1356,11 @@ use crate::parser_options::InternalParserOptions;
                         nodes.push(splat.unptr());
                         nodes.append(&mut mlhs_post);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | tSTAR mlhs_node
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     self.builder.splat(
@@ -1380,11 +1381,11 @@ use crate::parser_options::InternalParserOptions;
                         nodes.push(splat.unptr());
                         nodes.append(&mut mlhs_post);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | tSTAR
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     self.builder.splat(
@@ -1405,7 +1406,7 @@ use crate::parser_options::InternalParserOptions;
                         nodes.push(splat.unptr());
                         nodes.append(&mut mlhs_post);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -1415,7 +1416,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tLPAREN mlhs_inner rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin(
                                 $<Token>1,
                                 Maybe::some($<BoxedNode>2),
@@ -1427,43 +1428,43 @@ use crate::parser_options::InternalParserOptions;
 
        mlhs_head: mlhs_item tCOMMA
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | mlhs_head mlhs_item tCOMMA
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>2 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
        mlhs_post: mlhs_item
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | mlhs_post tCOMMA mlhs_item
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
        mlhs_node: user_variable
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable($<BoxedNode>1)?
                         );
                     }
                 | keyword_variable
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable($<BoxedNode>1)?
                         );
                     }
                 | primary_value tLBRACK2 opt_call_args rbracket
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.index_asgn(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -1479,7 +1480,7 @@ use crate::parser_options::InternalParserOptions;
                             return self.yyerror(@2, DiagnosticMessage::new_csend_inside_masgn());
                         }
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.attr_asgn(
                                 $<BoxedNode>1,
                                 op_t,
@@ -1489,7 +1490,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value tCOLON2 tIDENTIFIER
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.attr_asgn(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -1504,7 +1505,7 @@ use crate::parser_options::InternalParserOptions;
                             return self.yyerror(@2, DiagnosticMessage::new_csend_inside_masgn());
                         }
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.attr_asgn(
                                 $<BoxedNode>1,
                                 op_t,
@@ -1514,7 +1515,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value tCOLON2 tCONSTANT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable(
                                 self.builder.const_fetch(
                                     $<BoxedNode>1,
@@ -1526,7 +1527,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tCOLON3 tCONSTANT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable(
                                 self.builder.const_global(
                                     $<Token>1,
@@ -1537,7 +1538,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | backref
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable(
                                 $<BoxedNode>1
                             )?
@@ -1547,19 +1548,19 @@ use crate::parser_options::InternalParserOptions;
 
              lhs: user_variable
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable($<BoxedNode>1)?
                         );
                     }
                 | keyword_variable
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable($<BoxedNode>1)?
                         );
                     }
                 | primary_value tLBRACK2 opt_call_args rbracket
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.index_asgn(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -1570,7 +1571,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value call_op tIDENTIFIER
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.attr_asgn(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -1580,7 +1581,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value tCOLON2 tIDENTIFIER
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.attr_asgn(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -1590,7 +1591,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value call_op tCONSTANT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.attr_asgn(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -1600,7 +1601,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value tCOLON2 tCONSTANT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable(
                                 self.builder.const_fetch(
                                     $<BoxedNode>1,
@@ -1612,7 +1613,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tCOLON3 tCONSTANT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable(
                                 self.builder.const_global(
                                     $<Token>1,
@@ -1623,7 +1624,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | backref
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable(
                                 $<BoxedNode>1
                             )?
@@ -1643,19 +1644,19 @@ use crate::parser_options::InternalParserOptions;
 
            cpath: tCOLON3 cname
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_global($<Token>1, $<Token>2)
                         );
                     }
                 | cname
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_($<Token>1)
                         );
                     }
                 | primary_value tCOLON2 cname
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_fetch(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -1690,7 +1691,7 @@ use crate::parser_options::InternalParserOptions;
 
            fitem: fname
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.symbol_internal($<Token>1)
                         );
                     }
@@ -1702,18 +1703,18 @@ use crate::parser_options::InternalParserOptions;
 
       undef_list: fitem
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | undef_list tCOMMA
                     {
                         self.yylexer.lex_state.set(EXPR_FNAME|EXPR_FITEM);
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   fitem
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>4 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -1794,7 +1795,7 @@ use crate::parser_options::InternalParserOptions;
 
              arg: lhs tEQL arg_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assign(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -1804,7 +1805,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | var_lhs tOP_ASGN arg_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -1814,7 +1815,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value tLBRACK2 opt_call_args rbracket tOP_ASGN arg_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 self.builder.index(
                                     $<BoxedNode>1,
@@ -1829,7 +1830,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value call_op tIDENTIFIER tOP_ASGN arg_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 self.builder.call_method(
                                     Maybe::some($<BoxedNode>1),
@@ -1846,7 +1847,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value call_op tCONSTANT tOP_ASGN arg_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 self.builder.call_method(
                                     Maybe::some($<BoxedNode>1),
@@ -1863,7 +1864,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value tCOLON2 tIDENTIFIER tOP_ASGN arg_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 self.builder.call_method(
                                     Maybe::some($<BoxedNode>1),
@@ -1887,7 +1888,7 @@ use crate::parser_options::InternalParserOptions;
                                 $<Token>3
                             )
                         );
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 const_,
                                 $<Token>4,
@@ -1903,7 +1904,7 @@ use crate::parser_options::InternalParserOptions;
                                 $<Token>2
                             )
                         );
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 const_,
                                 $<Token>3,
@@ -1913,7 +1914,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | backref tOP_ASGN arg_rhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.op_assign(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -1929,7 +1930,7 @@ use crate::parser_options::InternalParserOptions;
                         let right = $<BoxedNode>3;
                         self.value_expr(&right)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_inclusive(
                                 Maybe::some(left),
                                 $<Token>2,
@@ -1945,7 +1946,7 @@ use crate::parser_options::InternalParserOptions;
                         let right = $<BoxedNode>3;
                         self.value_expr(&right)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_exclusive(
                                 Maybe::some(left),
                                 $<Token>2,
@@ -1958,7 +1959,7 @@ use crate::parser_options::InternalParserOptions;
                         let left = $<BoxedNode>1;
                         self.value_expr(&left)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_inclusive(
                                 Maybe::some(left),
                                 $<Token>2,
@@ -1971,7 +1972,7 @@ use crate::parser_options::InternalParserOptions;
                         let left = $<BoxedNode>1;
                         self.value_expr(&left)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_exclusive(
                                 Maybe::some(left),
                                 $<Token>2,
@@ -1984,7 +1985,7 @@ use crate::parser_options::InternalParserOptions;
                         let right = $<BoxedNode>2;
                         self.value_expr(&right)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_inclusive(
                                 Maybe::none(),
                                 $<Token>1,
@@ -1997,7 +1998,7 @@ use crate::parser_options::InternalParserOptions;
                         let right = $<BoxedNode>2;
                         self.value_expr(&right)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_exclusive(
                                 Maybe::none(),
                                 $<Token>1,
@@ -2007,43 +2008,43 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | arg tPLUS arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tMINUS arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tSTAR2 arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tDIVIDE arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tPERCENT arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tPOW arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | tUMINUS_NUM simple_numeric tPOW arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.unary_op(
                                 $<Token>1,
                                 self.builder.binary_op(
@@ -2056,7 +2057,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tUPLUS arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.unary_op(
                                 $<Token>1,
                                 $<BoxedNode>2
@@ -2065,7 +2066,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tUMINUS arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.unary_op(
                                 $<Token>1,
                                 $<BoxedNode>2
@@ -2074,25 +2075,25 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | arg tPIPE arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tCARET arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tAMPER2 arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tCMP arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
@@ -2102,31 +2103,31 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | arg tEQ arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tEQQ arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tNEQ arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tMATCH arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.match_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tNMATCH arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -2136,7 +2137,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tBANG arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.not_op(
                                 $<Token>1,
                                 Maybe::none(),
@@ -2147,7 +2148,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tTILDE arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.unary_op(
                                 $<Token>1,
                                 $<BoxedNode>2
@@ -2156,19 +2157,19 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | arg tLSHFT arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tRSHFT arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op($<BoxedNode>1, $<Token>2, $<BoxedNode>3)?
                         );
                     }
                 | arg tANDOP arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.logical_op(
                                 LogicalOp::And,
                                 $<BoxedNode>1,
@@ -2179,7 +2180,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | arg tOROP arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.logical_op(
                                 LogicalOp::Or,
                                 $<BoxedNode>1,
@@ -2190,7 +2191,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kDEFINED opt_nl arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Defined,
                                 $<Token>1,
@@ -2205,7 +2206,7 @@ use crate::parser_options::InternalParserOptions;
                         let expr = $<BoxedNode>1;
                         self.value_expr(&expr)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.ternary(
                                 expr,
                                 $<Token>2,
@@ -2220,7 +2221,7 @@ use crate::parser_options::InternalParserOptions;
                         let DefnHead { def_t, name_t } = $<DefnHead>1;
                         self.validate_endless_method_name(&name_t)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.def_endless_method(
                                 def_t,
                                 name_t,
@@ -2257,7 +2258,7 @@ use crate::parser_options::InternalParserOptions;
                             None,
                         );
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.def_endless_method(
                                 def_t,
                                 name_t,
@@ -2278,7 +2279,7 @@ use crate::parser_options::InternalParserOptions;
                         let DefsHead { def_t, definee, dot_t, name_t } = $<DefsHead>1;
                         self.validate_endless_method_name(&name_t)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.def_endless_singleton(
                                 def_t,
                                 definee,
@@ -2317,7 +2318,7 @@ use crate::parser_options::InternalParserOptions;
                             None,
                         );
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.def_endless_singleton(
                                 def_t,
                                 definee,
@@ -2361,7 +2362,7 @@ use crate::parser_options::InternalParserOptions;
 
         rel_expr: arg relop arg   %prec tGT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -2376,7 +2377,7 @@ use crate::parser_options::InternalParserOptions;
                             @2,
                             DiagnosticMessage::new_comparison_after_comparison(clone_value(&op_t))
                         );
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.binary_op(
                                 $<BoxedNode>1,
                                 op_t,
@@ -2390,13 +2391,13 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let arg = $<BoxedNode>1;
                         self.value_expr(&arg)?;
-                        $$ = Value::Node(arg);
+                        $$ = Value::new_node(arg);
                     }
                 ;
 
        aref_args: none
                     {
-                        $$ = Value::NodeList( Box::new( list![] ) );
+                        $$ = Value::new_node_list( Box::new( list![] ) );
                     }
                 | args trailer
                     {
@@ -2412,11 +2413,11 @@ use crate::parser_options::InternalParserOptions;
                                 Maybe::none()
                             ).unptr()
                         );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | assocs trailer
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     self.builder.associate(
@@ -2434,7 +2435,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let arg = $<BoxedNode>1;
                         self.value_expr(&arg)?;
-                        $$ = Value::Node(arg);
+                        $$ = Value::new_node(arg);
                     }
                 | arg kRESCUE_MOD arg
                     {
@@ -2450,7 +2451,7 @@ use crate::parser_options::InternalParserOptions;
                             Maybe::some($<BoxedNode>3)
                         );
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin_body(
                                 Maybe::some(arg),
                                 Box::new( list![ rescue_body.unptr() ] ),
@@ -2529,7 +2530,7 @@ use crate::parser_options::InternalParserOptions;
 
    opt_call_args: none
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | call_args
                     {
@@ -2543,11 +2544,11 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( self.builder.associate(Maybe::none(), $<NodeList>3, Maybe::none()).unptr() );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | assocs tCOMMA
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     self.builder.associate(
@@ -2565,14 +2566,14 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let command = $<Node>1;
                         self.value_expr(&command)?;
-                        $$ = Value::NodeList( Box::new(list![ command ]) );
+                        $$ = Value::new_node_list( Box::new(list![ command ]) );
                     }
                 | args opt_block_arg
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>2);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | assocs opt_block_arg
                     {
@@ -2584,7 +2585,7 @@ use crate::parser_options::InternalParserOptions;
                         nodes.push(hash.unptr());
                         nodes.append(&mut opt_block_arg);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | args tCOMMA assocs opt_block_arg
                     {
@@ -2596,11 +2597,11 @@ use crate::parser_options::InternalParserOptions;
                         nodes.push(hash.unptr());
                         nodes.append(&mut opt_block_arg);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | block_arg
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 ;
 
@@ -2618,7 +2619,7 @@ use crate::parser_options::InternalParserOptions;
                         if lookahead { self.yylexer.cmdarg.pop() }
                         self.yylexer.cmdarg.push(true);
                         if lookahead { self.yylexer.cmdarg.push(false) }
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   call_args
                     {
@@ -2634,7 +2635,7 @@ use crate::parser_options::InternalParserOptions;
 
        block_arg: tAMPER arg_value
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.block_pass(
                                 $<Token>1,
                                 $<BoxedNode>2
@@ -2645,21 +2646,21 @@ use crate::parser_options::InternalParserOptions;
 
    opt_block_arg: tCOMMA block_arg
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>2 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>2 ]) );
                     }
                 | none
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 ;
 
             args: arg_value
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | tSTAR arg_value
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     self.builder.splat(
@@ -2674,19 +2675,19 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | args tCOMMA tSTAR arg_value
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( self.builder.splat($<Token>3, Maybe::some($<BoxedNode>4)).unptr() );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
         mrhs_arg: mrhs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.array(Maybe::none(), $<NodeList>1, Maybe::none())
                         );
                     }
@@ -2700,7 +2701,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | args tCOMMA tSTAR arg_value
                     {
@@ -2708,11 +2709,11 @@ use crate::parser_options::InternalParserOptions;
                         nodes.push(
                             self.builder.splat($<Token>3, Maybe::some($<BoxedNode>4)).unptr()
                         );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | tSTAR arg_value
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     self.builder.splat(
@@ -2767,7 +2768,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tFID
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::none(),
                                 Maybe::none(),
@@ -2781,20 +2782,20 @@ use crate::parser_options::InternalParserOptions;
                 | k_begin
                     {
                         self.yylexer.cmdarg.push(false);
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   bodystmt
                   k_end
                     {
                         self.yylexer.cmdarg.pop();
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin_keyword($<Token>1, $<MaybeBoxedNode>3, $<Token>4)
                         );
                     }
-                | tLPAREN_ARG { self.yylexer.lex_state.set(EXPR_ENDARG); $<None>$ = Value::None; } rparen
+                | tLPAREN_ARG { self.yylexer.lex_state.set(EXPR_ENDARG); $<None>$ = Value::new_none(self.arena); } rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin(
                                 $<Token>1,
                                 Maybe::none(),
@@ -2802,9 +2803,9 @@ use crate::parser_options::InternalParserOptions;
                             )
                         );
                     }
-                | tLPAREN_ARG stmt { self.yylexer.lex_state.set(EXPR_ENDARG); $<None>$ = Value::None; } rparen
+                | tLPAREN_ARG stmt { self.yylexer.lex_state.set(EXPR_ENDARG); $<None>$ = Value::new_none(self.arena); } rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin(
                                 $<Token>1,
                                 Maybe::some($<BoxedNode>2),
@@ -2814,7 +2815,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tLPAREN compstmt tRPAREN
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin(
                                 $<Token>1,
                                 $<MaybeBoxedNode>2,
@@ -2824,7 +2825,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | primary_value tCOLON2 tCONSTANT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_fetch(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -2834,13 +2835,13 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tCOLON3 tCONSTANT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_global($<Token>1, $<Token>2)
                         );
                     }
                 | tLBRACK aref_args tRBRACK
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.array(
                                 Maybe::some($<Token>1),
                                 $<NodeList>2,
@@ -2850,7 +2851,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | tLBRACE assoc_list tRCURLY
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.associate(
                                 Maybe::some($<Token>1),
                                 $<NodeList>2,
@@ -2860,7 +2861,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | k_return
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Return,
                                 $<Token>1,
@@ -2872,7 +2873,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kYIELD tLPAREN2 call_args rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Yield,
                                 $<Token>1,
@@ -2884,7 +2885,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kYIELD tLPAREN2 rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Yield,
                                 $<Token>1,
@@ -2896,7 +2897,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kYIELD
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Yield,
                                 $<Token>1,
@@ -2908,7 +2909,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kDEFINED opt_nl tLPAREN2 expr rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Defined,
                                 $<Token>1,
@@ -2920,7 +2921,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kNOT tLPAREN2 expr rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.not_op(
                                 $<Token>1,
                                 Maybe::some($<Token>2),
@@ -2931,7 +2932,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kNOT tLPAREN2 rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.not_op(
                                 $<Token>1,
                                 Maybe::some($<Token>2),
@@ -2952,7 +2953,7 @@ use crate::parser_options::InternalParserOptions;
                         );
                         let BraceBlock { begin_t, args_type, body, end_t } = $<BraceBlock>2;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.block(
                                 method_call,
                                 begin_t,
@@ -2969,7 +2970,7 @@ use crate::parser_options::InternalParserOptions;
                 | method_call brace_block
                     {
                         let BraceBlock { begin_t, args_type, body, end_t } = $<BraceBlock>2;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.block(
                                 $<BoxedNode>1,
                                 begin_t,
@@ -2990,7 +2991,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let IfTail { keyword_t, body: else_body } = $<IfTail>5;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.condition(
                                 $<Token>1,
                                 $<BoxedNode>2,
@@ -3009,7 +3010,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let (else_t, body) = $<OptElse>5.map(|else_| (Maybe::some(else_.else_t), else_.body)).unwrap_or_else(|| (Maybe::none(), Maybe::none()));
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.condition(
                                 $<Token>1,
                                 $<BoxedNode>2,
@@ -3026,7 +3027,7 @@ use crate::parser_options::InternalParserOptions;
                   k_end
                     {
                         let ExprValueDo { value, do_t } = $<ExprValueDo>2;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.loop_(
                                 LoopType::While,
                                 $<Token>1,
@@ -3042,7 +3043,7 @@ use crate::parser_options::InternalParserOptions;
                   k_end
                     {
                         let ExprValueDo { value, do_t } = $<ExprValueDo>2;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.loop_(
                                 LoopType::Until,
                                 $<Token>1,
@@ -3057,7 +3058,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         // TODO: there's a warning that wq/parser doesn't trigger,
                         // search for `p->case_labels`
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   case_body
                   k_end
@@ -3065,7 +3066,7 @@ use crate::parser_options::InternalParserOptions;
                         let CaseBody { when_bodies, opt_else } = $<CaseBody>5;
                         let (else_t, else_body) = opt_else.map(|else_| (Maybe::some(else_.else_t), else_.body)).unwrap_or_else(|| (Maybe::none(), Maybe::none()));
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.case(
                                 $<Token>1,
                                 Maybe::some($<BoxedNode>2),
@@ -3080,7 +3081,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         // TODO: there's a warning that wq/parser doesn't trigger,
                         // search for `p->case_labels`
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   case_body
                   k_end
@@ -3088,7 +3089,7 @@ use crate::parser_options::InternalParserOptions;
                         let CaseBody { when_bodies, opt_else } = $<CaseBody>4;
                         let (else_t, else_body) = opt_else.map(|else_| (Maybe::some(else_.else_t), else_.body)).unwrap_or_else(|| (Maybe::none(), Maybe::none()));
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.case(
                                 $<Token>1,
                                 Maybe::none(),
@@ -3106,7 +3107,7 @@ use crate::parser_options::InternalParserOptions;
                         let PCaseBody { in_bodies, opt_else } = $<PCaseBody>4;
                         let (else_t, else_body) = opt_else.map(|else_| (Maybe::some(else_.else_t), else_.body)).unwrap_or_else(|| (Maybe::none(), Maybe::none()));
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.case_match(
                                 $<Token>1,
                                 $<BoxedNode>2,
@@ -3122,7 +3123,7 @@ use crate::parser_options::InternalParserOptions;
                   k_end
                     {
                         let ExprValueDo { value, do_t } = $<ExprValueDo>4;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.for_(
                                 $<Token>1,
                                 $<BoxedNode>2,
@@ -3140,7 +3141,7 @@ use crate::parser_options::InternalParserOptions;
                         self.yylexer.cmdarg.push(false);
                         self.yylexer.cond.push(false);
                         self.context.push_class();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   bodystmt
                   k_end
@@ -3151,7 +3152,7 @@ use crate::parser_options::InternalParserOptions;
 
                         let Superclass { lt_t, value } = $<Superclass>3;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.def_class(
                                 $<Token>1,
                                 $<BoxedNode>2,
@@ -3173,13 +3174,13 @@ use crate::parser_options::InternalParserOptions;
                         self.yylexer.cmdarg.push(false);
                         self.yylexer.cond.push(false);
                         self.context.push_sclass();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   term
                   bodystmt
                   k_end
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.def_sclass(
                                 $<Token>1,
                                 $<Token>2,
@@ -3199,7 +3200,7 @@ use crate::parser_options::InternalParserOptions;
                         self.static_env.extend_static();
                         self.yylexer.cmdarg.push(false);
                         self.context.push_module();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   bodystmt
                   k_end
@@ -3208,7 +3209,7 @@ use crate::parser_options::InternalParserOptions;
                             return self.yyerror(@1, DiagnosticMessage::new_module_definition_in_method_body());
                         }
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.def_module(
                                 $<Token>1,
                                 $<BoxedNode>2,
@@ -3228,7 +3229,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let DefnHead { def_t, name_t } = $<DefnHead>1;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.def_method(
                                 def_t,
                                 name_t,
@@ -3251,7 +3252,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let DefsHead { def_t, definee, dot_t, name_t } = $<DefsHead>1;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.def_singleton(
                                 def_t,
                                 definee,
@@ -3271,7 +3272,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kBREAK
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Break,
                                 $<Token>1,
@@ -3283,7 +3284,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kNEXT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Next,
                                 $<Token>1,
@@ -3295,7 +3296,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kREDO
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Redo,
                                 $<Token>1,
@@ -3307,7 +3308,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | kRETRY
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Retry,
                                 $<Token>1,
@@ -3323,7 +3324,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let primary = $<BoxedNode>1;
                         self.value_expr(&primary)?;
-                        $$ = Value::Node(primary);
+                        $$ = Value::new_node(primary);
                     }
                 ;
 
@@ -3485,7 +3486,7 @@ use crate::parser_options::InternalParserOptions;
 
                         $$ = Value::new_if_tail(
                             IfTail {
-                                keyword_t: Maybe::some(elsif_t.clone()),
+                                keyword_t: Maybe::some(elsif_t),
                                 body: Maybe::some(
                                     self.builder.condition(
                                         elsif_t,
@@ -3526,13 +3527,13 @@ use crate::parser_options::InternalParserOptions;
 
           f_marg: f_norm_arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.arg($<Token>1)?
                         );
                     }
                 | tLPAREN f_margs rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.multi_lhs(
                                 Maybe::some($<Token>1),
                                 $<NodeList>2,
@@ -3544,13 +3545,13 @@ use crate::parser_options::InternalParserOptions;
 
      f_marg_list: f_marg
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | f_marg_list tCOMMA f_marg
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -3562,7 +3563,7 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_marg_list tCOMMA f_rest_marg tCOMMA f_marg_list
                     {
@@ -3574,11 +3575,11 @@ use crate::parser_options::InternalParserOptions;
                         nodes.push(f_rest_marg);
                         nodes.append(&mut f_marg_list);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_rest_marg
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | f_rest_marg tCOMMA f_marg_list
                     {
@@ -3590,19 +3591,19 @@ use crate::parser_options::InternalParserOptions;
                         nodes.push(f_rest_marg);
                         nodes.append(&mut f_marg_list);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
      f_rest_marg: tSTAR f_norm_arg
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.restarg($<Token>1, Maybe::some($<Token>2))?
                         );
                     }
                 | tSTAR
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.restarg($<Token>1, Maybe::none())?
                         );
                     }
@@ -3628,25 +3629,25 @@ use crate::parser_options::InternalParserOptions;
                         nodes.append(&mut f_kwrest);
                         nodes.append(&mut opt_f_block_arg);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_block_kwarg opt_f_block_arg
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>2);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_any_kwrest opt_f_block_arg
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>2);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_block_arg
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 ;
 
@@ -3657,7 +3658,7 @@ opt_block_args_tail:
                     }
                 | /* none */
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 ;
 
@@ -3679,7 +3680,7 @@ opt_block_args_tail:
                         nodes.append(&mut f_rest_arg);
                         nodes.append(&mut opt_block_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg tCOMMA f_block_optarg tCOMMA f_rest_arg tCOMMA f_arg opt_block_args_tail
                     {
@@ -3695,7 +3696,7 @@ opt_block_args_tail:
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_block_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg tCOMMA f_block_optarg opt_block_args_tail
                     {
@@ -3707,7 +3708,7 @@ opt_block_args_tail:
                         nodes.append(&mut f_block_optarg);
                         nodes.append(&mut opt_block_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg tCOMMA f_block_optarg tCOMMA f_arg opt_block_args_tail
                     {
@@ -3721,7 +3722,7 @@ opt_block_args_tail:
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_block_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg tCOMMA f_rest_arg opt_block_args_tail
                     {
@@ -3733,7 +3734,7 @@ opt_block_args_tail:
                         nodes.append(&mut f_rest_arg);
                         nodes.append(&mut opt_block_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg excessed_comma
                     {
@@ -3751,7 +3752,7 @@ opt_block_args_tail:
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_block_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg opt_block_args_tail
                     {
@@ -3769,7 +3770,7 @@ opt_block_args_tail:
                             nodes.append(&mut opt_block_args_tail);
                         }
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_block_optarg tCOMMA f_rest_arg opt_block_args_tail
                     {
@@ -3781,7 +3782,7 @@ opt_block_args_tail:
                         nodes.append(&mut f_rest_arg);
                         nodes.append(&mut opt_block_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_block_optarg tCOMMA f_rest_arg tCOMMA f_arg opt_block_args_tail
                     {
@@ -3795,14 +3796,14 @@ opt_block_args_tail:
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_block_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_block_optarg opt_block_args_tail
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>2);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_block_optarg tCOMMA f_arg opt_block_args_tail
                     {
@@ -3814,14 +3815,14 @@ opt_block_args_tail:
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_block_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_rest_arg opt_block_args_tail
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>2);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_rest_arg tCOMMA f_arg opt_block_args_tail
                     {
@@ -3833,7 +3834,7 @@ opt_block_args_tail:
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_block_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | block_args_tail
                     {
@@ -3843,7 +3844,7 @@ opt_block_args_tail:
 
  opt_block_param: none
                     {
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.args(Maybe::none(), Box::new( list![] ), Maybe::none())
                         );
                     }
@@ -3859,7 +3860,7 @@ opt_block_args_tail:
                         self.max_numparam_stack.set_has_ordinary_params();
                         self.current_arg_stack.set(None);
 
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.args(
                                 Maybe::some($<Token>1),
                                 $<NodeList>2,
@@ -3875,7 +3876,7 @@ opt_block_args_tail:
                         let mut nodes = $<NodeList>2;
                         nodes.append(&mut $<NodeList>3);
 
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.args(
                                 Maybe::some($<Token>1),
                                 nodes,
@@ -3888,7 +3889,7 @@ opt_block_args_tail:
 
      opt_bv_decl: opt_nl
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | opt_nl tSEMI bv_decls opt_nl
                     {
@@ -3898,13 +3899,13 @@ opt_block_args_tail:
 
         bv_decls: bvar
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | bv_decls tCOMMA bvar
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -3912,13 +3913,13 @@ opt_block_args_tail:
                     {
                         let ident_t = $<Token>1;
                         self.static_env.declare(clone_value(&ident_t).as_str());
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.shadowarg(ident_t)?
                         );
                     }
                 | f_bad_arg
                     {
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
                     }
                 ;
 
@@ -3927,14 +3928,14 @@ opt_block_args_tail:
                         self.static_env.extend_dynamic();
                         self.max_numparam_stack.push();
                         self.context.push_lambda();
-                        $<Num>$ = Value::Num(self.yylexer.lpar_beg);
+                        $<Num>$ = Value::new_num(self.yylexer.lpar_beg);
                         self.yylexer.lpar_beg = self.yylexer.paren_nest;
                     }
                   f_larglist
                     {
                         self.context.pop();
                         self.yylexer.cmdarg.push(false);
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   lambda_body
                     {
@@ -3952,7 +3953,7 @@ opt_block_args_tail:
                         self.static_env.unextend();
                         self.yylexer.cmdarg.pop();
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.block(
                                 lambda_call,
                                 begin_t,
@@ -3971,7 +3972,7 @@ opt_block_args_tail:
                         let mut nodes = $<NodeList>2;
                         nodes.append(&mut $<NodeList>3);
 
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.args(
                                 Maybe::some($<Token>1),
                                 nodes,
@@ -3985,7 +3986,7 @@ opt_block_args_tail:
                         if !args.is_empty() {
                             self.max_numparam_stack.set_has_ordinary_params();
                         }
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.args(Maybe::none(), args, Maybe::none())
                         );
                     }
@@ -3994,7 +3995,7 @@ opt_block_args_tail:
      lambda_body: tLAMBEG
                     {
                         self.context.push_lambda();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   compstmt tRCURLY
                     {
@@ -4010,7 +4011,7 @@ opt_block_args_tail:
                 | kDO_LAMBDA
                     {
                         self.context.push_lambda();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   bodystmt k_end
                     {
@@ -4028,7 +4029,7 @@ opt_block_args_tail:
         do_block: k_do_block
                     {
                         self.context.push_block();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   do_body k_end
                     {
@@ -4048,7 +4049,7 @@ opt_block_args_tail:
       block_call: command do_block
                     {
                         let DoBlock { begin_t, args_type, body, end_t } = $<DoBlock>2;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.block(
                                 $<BoxedNode>1,
                                 begin_t,
@@ -4061,7 +4062,7 @@ opt_block_args_tail:
                 | block_call call_op2 operation2 opt_paren_args
                     {
                         let OptParenArgs { begin_t, args, end_t } = $<OptParenArgs>4;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
@@ -4085,7 +4086,7 @@ opt_block_args_tail:
                         );
 
                         let BraceBlock { begin_t, args_type, body, end_t } = $<BraceBlock>5;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.block(
                                 method_call,
                                 begin_t,
@@ -4107,7 +4108,7 @@ opt_block_args_tail:
                         );
 
                         let DoBlock { begin_t, args_type, body, end_t } = $<DoBlock>5;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.block(
                                 method_call,
                                 begin_t,
@@ -4123,7 +4124,7 @@ opt_block_args_tail:
                     {
                         let ParenArgs { begin_t, args, end_t } = $<ParenArgs>2;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::none(),
                                 Maybe::none(),
@@ -4138,7 +4139,7 @@ opt_block_args_tail:
                     {
                         let OptParenArgs { begin_t, args, end_t } = $<OptParenArgs>4;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
@@ -4153,7 +4154,7 @@ opt_block_args_tail:
                     {
                         let ParenArgs { begin_t, args, end_t } = $<ParenArgs>4;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
@@ -4166,7 +4167,7 @@ opt_block_args_tail:
                     }
                 | primary_value tCOLON2 operation3
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
@@ -4181,7 +4182,7 @@ opt_block_args_tail:
                     {
                         let ParenArgs { begin_t, args, end_t } = $<ParenArgs>3;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
@@ -4196,7 +4197,7 @@ opt_block_args_tail:
                     {
                         let ParenArgs { begin_t, args, end_t } = $<ParenArgs>3;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.call_method(
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
@@ -4211,7 +4212,7 @@ opt_block_args_tail:
                     {
                         let ParenArgs { begin_t, args, end_t } = $<ParenArgs>2;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Super,
                                 $<Token>1,
@@ -4223,7 +4224,7 @@ opt_block_args_tail:
                     }
                 | kSUPER
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.keyword_cmd(
                                 KeywordCmd::Zsuper,
                                 $<Token>1,
@@ -4235,7 +4236,7 @@ opt_block_args_tail:
                     }
                 | primary_value tLBRACK2 opt_call_args rbracket
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.index(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -4249,7 +4250,7 @@ opt_block_args_tail:
      brace_block: tLCURLY
                     {
                         self.context.push_block();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   brace_body tRCURLY
                     {
@@ -4268,7 +4269,7 @@ opt_block_args_tail:
                 | k_do
                     {
                         self.context.push_block();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   do_body k_end
                     {
@@ -4289,7 +4290,7 @@ opt_block_args_tail:
       brace_body:   {
                         self.static_env.extend_dynamic();
                         self.max_numparam_stack.push();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   opt_block_param compstmt
                     {
@@ -4315,7 +4316,7 @@ opt_block_args_tail:
                         self.static_env.extend_dynamic();
                         self.max_numparam_stack.push();
                         self.yylexer.cmdarg.push(false);
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   opt_block_param bodystmt
                     {
@@ -4337,11 +4338,11 @@ opt_block_args_tail:
 
        case_args: arg_value
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | tSTAR arg_value
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     self.builder.splat(
@@ -4356,13 +4357,13 @@ opt_block_args_tail:
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | case_args tCOMMA tSTAR arg_value
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( self.builder.splat($<Token>3, Maybe::some($<BoxedNode>4)).unptr() );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -4399,7 +4400,7 @@ opt_block_args_tail:
                         self.pattern_variables.push();
                         self.pattern_hash_keys.push();
 
-                        $<Bool>$ = Value::Bool(self.yylexer.in_kwarg);
+                        $<Bool>$ = Value::new_bool(self.yylexer.in_kwarg);
                         self.yylexer.in_kwarg = true;
                     }
                   p_top_expr then
@@ -4407,7 +4408,7 @@ opt_block_args_tail:
                         self.yylexer.in_kwarg = $<Bool>2;
                         self.pattern_variables.pop();
                         self.pattern_hash_keys.pop();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   compstmt
                   p_cases
@@ -4464,7 +4465,7 @@ opt_block_args_tail:
                     }
                 | p_expr tCOMMA
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.array_pattern(
                                 Maybe::none(),
                                 Box::new(list![ $<Node>1 ]),
@@ -4481,25 +4482,25 @@ opt_block_args_tail:
                         nodes.push($<Node>1);
                         nodes.append(&mut elements);
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.array_pattern(Maybe::none(), nodes, trailing_comma, Maybe::none())
                         );
                     }
                 | p_find
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.find_pattern(Maybe::none(), $<NodeList>1, Maybe::none())
                         );
                     }
                 | p_args_tail
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.array_pattern(Maybe::none(), $<NodeList>1, Maybe::none(), Maybe::none())
                         );
                     }
                 | p_kwargs
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.hash_pattern(Maybe::none(), $<NodeList>1, Maybe::none())
                         );
                     }
@@ -4513,7 +4514,7 @@ opt_block_args_tail:
 
             p_as: p_expr tASSOC p_variable
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.match_as(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -4529,7 +4530,7 @@ opt_block_args_tail:
 
            p_alt: p_alt tPIPE p_expr_basic
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.match_alt(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -4566,7 +4567,7 @@ opt_block_args_tail:
                         self.pattern_hash_keys.pop();
                         let MatchPatternWithTrailingComma { elements, trailing_comma } = $<MatchPatternWithTrailingComma>3;
                         let pattern = self.builder.array_pattern(Maybe::none(), elements, trailing_comma, Maybe::none());
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_pattern(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -4579,7 +4580,7 @@ opt_block_args_tail:
                     {
                         self.pattern_hash_keys.pop();
                         let pattern = self.builder.find_pattern(Maybe::none(), $<NodeList>3, Maybe::none());
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_pattern(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -4592,7 +4593,7 @@ opt_block_args_tail:
                     {
                         self.pattern_hash_keys.pop();
                         let pattern = self.builder.hash_pattern(Maybe::none(), $<NodeList>3, Maybe::none());
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_pattern(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -4606,12 +4607,12 @@ opt_block_args_tail:
                         let lparen = $<Token>2;
                         let rparen = $<Token>3;
                         let pattern = self.builder.array_pattern(
-                            Maybe::some(lparen.clone()),
+                            Maybe::some(lparen),
                             Box::new( list![] ),
                             Maybe::none(),
-                            Maybe::some(rparen.clone())
+                            Maybe::some(rparen)
                         );
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_pattern(
                                 $<BoxedNode>1,
                                 lparen,
@@ -4625,7 +4626,7 @@ opt_block_args_tail:
                         self.pattern_hash_keys.pop();
                         let MatchPatternWithTrailingComma { elements, trailing_comma } = $<MatchPatternWithTrailingComma>3;
                         let pattern = self.builder.array_pattern(Maybe::none(), elements, trailing_comma, Maybe::none());
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_pattern(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -4638,7 +4639,7 @@ opt_block_args_tail:
                     {
                         self.pattern_hash_keys.pop();
                         let pattern = self.builder.find_pattern(Maybe::none(), $<NodeList>3, Maybe::none());
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_pattern(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -4651,7 +4652,7 @@ opt_block_args_tail:
                     {
                         self.pattern_hash_keys.pop();
                         let pattern = self.builder.hash_pattern(Maybe::none(), $<NodeList>3, Maybe::none());
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_pattern(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -4665,12 +4666,12 @@ opt_block_args_tail:
                         let lparen = $<Token>2;
                         let rparen = $<Token>3;
                         let pattern = self.builder.array_pattern(
-                            Maybe::some(lparen.clone()),
+                            Maybe::some(lparen),
                             Box::new( list![] ),
                             Maybe::none(),
-                            Maybe::some(rparen.clone())
+                            Maybe::some(rparen)
                         );
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_pattern(
                                 $<BoxedNode>1,
                                 lparen,
@@ -4682,7 +4683,7 @@ opt_block_args_tail:
                 | tLBRACK p_args rbracket
                     {
                         let MatchPatternWithTrailingComma { elements, trailing_comma } = $<MatchPatternWithTrailingComma>2;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.array_pattern(
                                 Maybe::some($<Token>1),
                                 elements,
@@ -4693,7 +4694,7 @@ opt_block_args_tail:
                     }
                 | tLBRACK p_find rbracket
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.find_pattern(
                                 Maybe::some($<Token>1),
                                 $<NodeList>2,
@@ -4703,7 +4704,7 @@ opt_block_args_tail:
                     }
                 | tLBRACK rbracket
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.array_pattern(
                                 Maybe::some($<Token>1),
                                 Box::new( list![] ),
@@ -4715,14 +4716,14 @@ opt_block_args_tail:
                 | tLBRACE
                     {
                         self.pattern_hash_keys.push();
-                        $<Bool>$ = Value::Bool(self.yylexer.in_kwarg);
+                        $<Bool>$ = Value::new_bool(self.yylexer.in_kwarg);
                         self.yylexer.in_kwarg = false;
                     }
                   p_kwargs rbrace
                     {
                         self.pattern_hash_keys.pop();
                         self.yylexer.in_kwarg = $<Bool>2;
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.hash_pattern(
                                 Maybe::some($<Token>1),
                                 $<NodeList>3,
@@ -4732,7 +4733,7 @@ opt_block_args_tail:
                     }
                 | tLBRACE rbrace
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.hash_pattern(
                                 Maybe::some($<Token>1),
                                 Box::new( list![] ),
@@ -4743,12 +4744,12 @@ opt_block_args_tail:
                 | tLPAREN
                     {
                         self.pattern_hash_keys.push();
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   p_expr rparen
                     {
                         self.pattern_hash_keys.pop();
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin(
                                 $<Token>1,
                                 Maybe::some($<BoxedNode>3),
@@ -4880,7 +4881,7 @@ opt_block_args_tail:
 
      p_args_tail: p_rest
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | p_rest tCOMMA p_args_post
                     {
@@ -4890,7 +4891,7 @@ opt_block_args_tail:
                         nodes.push($<Node>1);
                         nodes.append(&mut p_args_post);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -4903,20 +4904,20 @@ opt_block_args_tail:
                         nodes.append(&mut p_args_post);
                         nodes.push($<Node>5);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
 
           p_rest: tSTAR tIDENTIFIER
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.match_rest($<Token>1, Maybe::some($<Token>2))?
                         );
                     }
                 | tSTAR
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.match_rest($<Token>1, Maybe::none())?
                         );
                     }
@@ -4924,13 +4925,13 @@ opt_block_args_tail:
 
      p_args_post: p_arg
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | p_args_post tCOMMA p_arg
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -4945,7 +4946,7 @@ opt_block_args_tail:
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>3);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | p_kwarg
                     {
@@ -4963,19 +4964,19 @@ opt_block_args_tail:
 
          p_kwarg: p_kw
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | p_kwarg tCOMMA p_kw
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
             p_kw: p_kw_label p_expr
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.match_pair(
                                 $<PKwLabel>1,
                                 $<BoxedNode>2
@@ -4984,7 +4985,7 @@ opt_block_args_tail:
                     }
                 | p_kw_label
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.match_label(
                                 $<PKwLabel>1,
                             )?
@@ -5008,7 +5009,7 @@ opt_block_args_tail:
 
         p_kwrest: kwrest_mark tIDENTIFIER
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     (
@@ -5023,7 +5024,7 @@ opt_block_args_tail:
                     }
                 | kwrest_mark
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     (
@@ -5040,7 +5041,7 @@ opt_block_args_tail:
 
       p_kwnorest: kwrest_mark kNIL
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     self.builder.match_nil_pattern(
@@ -5075,7 +5076,7 @@ opt_block_args_tail:
                         let right = $<BoxedNode>3;
                         self.value_expr(&right)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_inclusive(
                                 Maybe::some(left),
                                 $<Token>2,
@@ -5091,7 +5092,7 @@ opt_block_args_tail:
                         let right = $<BoxedNode>3;
                         self.value_expr(&right)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_exclusive(
                                 Maybe::some(left),
                                 $<Token>2,
@@ -5104,7 +5105,7 @@ opt_block_args_tail:
                         let left = $<BoxedNode>1;
                         self.value_expr(&left)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_inclusive(
                                 Maybe::some(left),
                                 $<Token>2,
@@ -5117,7 +5118,7 @@ opt_block_args_tail:
                         let left = $<BoxedNode>1;
                         self.value_expr(&left)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_exclusive(
                                 Maybe::some(left),
                                 $<Token>2,
@@ -5142,7 +5143,7 @@ opt_block_args_tail:
                         let right = $<BoxedNode>2;
                         self.value_expr(&right)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_inclusive(
                                 Maybe::none(),
                                 $<Token>1,
@@ -5155,7 +5156,7 @@ opt_block_args_tail:
                         let right = $<BoxedNode>2;
                         self.value_expr(&right)?;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.range_exclusive(
                                 Maybe::none(),
                                 $<Token>1,
@@ -5199,7 +5200,7 @@ opt_block_args_tail:
                     }
                 | keyword_variable
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.accessible($<BoxedNode>1)
                         );
                     }
@@ -5211,7 +5212,7 @@ opt_block_args_tail:
 
       p_variable: tIDENTIFIER
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.match_var($<Token>1)?
                         );
                     }
@@ -5227,7 +5228,7 @@ opt_block_args_tail:
                         }
 
                         let lvar = self.builder.accessible(self.builder.lvar(ident_t));
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.pin($<Token>1, lvar)
                         );
                     }
@@ -5235,13 +5236,13 @@ opt_block_args_tail:
 
          p_const: tCOLON3 cname
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_global($<Token>1, $<Token>2)
                         );
                     }
                 | p_const tCOLON2 cname
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_fetch(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -5251,7 +5252,7 @@ opt_block_args_tail:
                     }
                 | tCONSTANT
                     {
-                        $$ = Value::Node(self.builder.const_($<Token>1));
+                        $$ = Value::new_node(self.builder.const_($<Token>1));
                     }
                 ;
 
@@ -5282,17 +5283,17 @@ opt_block_args_tail:
                         nodes.push(rescue_body.unptr());
                         nodes.append(&mut opt_rescue);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | none
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 ;
 
         exc_list: arg_value
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | mrhs
                     {
@@ -5300,7 +5301,7 @@ opt_block_args_tail:
                     }
                 | none
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 ;
 
@@ -5340,7 +5341,7 @@ opt_block_args_tail:
 
          strings: string
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.string_compose(
                                 Maybe::none(),
                                 $<NodeList>1,
@@ -5352,7 +5353,7 @@ opt_block_args_tail:
 
           string: tCHAR
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     self.builder.character($<Token>1).unptr()
@@ -5362,13 +5363,13 @@ opt_block_args_tail:
                     }
                 | string1
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | string string1
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>2 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -5378,7 +5379,7 @@ opt_block_args_tail:
                         let indent = self.yylexer.buffer.heredoc_indent;
                         self.yylexer.buffer.heredoc_indent = 0;
                         string = Ptr::new(self.builder.heredoc_dedent(string.unptr(), indent));
-                        $$ = Value::Node(string);
+                        $$ = Value::new_node(string);
                     }
                 ;
 
@@ -5388,15 +5389,15 @@ opt_block_args_tail:
                         let indent = self.yylexer.buffer.heredoc_indent;
                         self.yylexer.buffer.heredoc_indent = 0;
                         string = Ptr::new(self.builder.heredoc_dedent(string.unptr(), indent));
-                        $$ = Value::Node(string);
+                        $$ = Value::new_node(string);
                     }
                 ;
 
           regexp: tREGEXP_BEG regexp_contents tREGEXP_END
                     {
                         let regexp_end = $<Token>3;
-                        let opts = self.builder.regexp_options(regexp_end.clone());
-                        $$ = Value::Node(
+                        let opts = self.builder.regexp_options(regexp_end);
+                        $$ = Value::new_node(
                             self.builder.regexp_compose(
                                 $<Token>1,
                                 $<NodeList>2,
@@ -5409,7 +5410,7 @@ opt_block_args_tail:
 
            words: tWORDS_BEG tSPACE word_list tSTRING_END
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.words_compose(
                                 $<Token>1,
                                 $<NodeList>3,
@@ -5421,7 +5422,7 @@ opt_block_args_tail:
 
        word_list: /* none */
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
 
                     }
                 | word_list word tSPACE
@@ -5430,25 +5431,25 @@ opt_block_args_tail:
                         nodes.push(
                             self.builder.word( $<NodeList>2 ).unptr()
                         );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
             word: string_content
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | word string_content
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>2 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
          symbols: tSYMBOLS_BEG tSPACE symbol_list tSTRING_END
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.symbols_compose(
                                 $<Token>1,
                                 $<NodeList>3,
@@ -5460,7 +5461,7 @@ opt_block_args_tail:
 
      symbol_list: /* none */
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | symbol_list word tSPACE
                     {
@@ -5468,13 +5469,13 @@ opt_block_args_tail:
                         nodes.push(
                             self.builder.word( $<NodeList>2 ).unptr()
                         );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
           qwords: tQWORDS_BEG tSPACE qword_list tSTRING_END
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.words_compose(
                                 $<Token>1,
                                 $<NodeList>3,
@@ -5486,7 +5487,7 @@ opt_block_args_tail:
 
         qsymbols: tQSYMBOLS_BEG tSPACE qsym_list tSTRING_END
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.symbols_compose(
                                 $<Token>1,
                                 $<NodeList>3,
@@ -5498,7 +5499,7 @@ opt_block_args_tail:
 
       qword_list: /* none */
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | qword_list tSTRING_CONTENT tSPACE
                     {
@@ -5506,13 +5507,13 @@ opt_block_args_tail:
                         nodes.push(
                             self.builder.string_internal( $<Token>2 ).unptr()
                         );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
        qsym_list: /* none */
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | qsym_list tSTRING_CONTENT tSPACE
                     {
@@ -5520,55 +5521,55 @@ opt_block_args_tail:
                         nodes.push(
                             self.builder.symbol_internal( $<Token>2 ).unptr()
                         );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
  string_contents: /* none */
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | string_contents string_content
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push($<Node>2);
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
 xstring_contents: /* none */
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | xstring_contents string_content
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push($<Node>2);
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
  regexp_contents: /* none */
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | regexp_contents string_content
                     {
                         let mut  nodes = $<NodeList>1;
                         nodes.push( $<Node>2 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
   string_content: tSTRING_CONTENT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.string_internal($<Token>1)
                         );
                     }
                 | tSTRING_DVAR
                     {
-                        $<MaybeStrTerm>$ = Value::MaybeStrTerm(std::mem::take(&mut self.yylexer.strterm));
+                        $<MaybeStrTerm>$ = Value::new_maybe_str_term(std::mem::take(&mut self.yylexer.strterm));
                         self.yylexer.lex_state.set(EXPR_BEG);
                     }
                   string_dvar
@@ -5580,21 +5581,21 @@ xstring_contents: /* none */
                     {
                         self.yylexer.cmdarg.push(false);
                         self.yylexer.cond.push(false);
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                     {
-                        $<MaybeStrTerm>$ = Value::MaybeStrTerm(std::mem::take(&mut self.yylexer.strterm));
+                        $<MaybeStrTerm>$ = Value::new_maybe_str_term(std::mem::take(&mut self.yylexer.strterm));
                     }
                     {
-                        $<Num>$ = Value::Num( self.yylexer.lex_state.get() );
+                        $<Num>$ = Value::new_num( self.yylexer.lex_state.get() );
                         self.yylexer.lex_state.set(EXPR_BEG);
                     }
                     {
-                        $<Num>$ = Value::Num( self.yylexer.brace_nest );
+                        $<Num>$ = Value::new_num( self.yylexer.brace_nest );
                         self.yylexer.brace_nest = 0;
                     }
                     {
-                        $<Num>$ = Value::Num( self.yylexer.buffer.heredoc_indent );
+                        $<Num>$ = Value::new_num( self.yylexer.buffer.heredoc_indent );
                         self.yylexer.buffer.heredoc_indent = 0;
                     }
                   compstmt tSTRING_DEND
@@ -5607,7 +5608,7 @@ xstring_contents: /* none */
                         self.yylexer.buffer.heredoc_indent = $<Num>6;
                         self.yylexer.buffer.heredoc_line_indent = -1;
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.begin(
                                 $<Token>1,
                                 $<MaybeBoxedNode>7,
@@ -5619,16 +5620,16 @@ xstring_contents: /* none */
 
      string_dvar: tGVAR
                     {
-                        $$ = Value::Node(self.builder.gvar($<Token>1));
+                        $$ = Value::new_node(self.builder.gvar($<Token>1));
                     }
                 | tIVAR
                     {
-                        $$ = Value::Node(self.builder.ivar($<Token>1));
+                        $$ = Value::new_node(self.builder.ivar($<Token>1));
 
                     }
                 | tCVAR
                     {
-                        $$ = Value::Node(self.builder.cvar($<Token>1));
+                        $$ = Value::new_node(self.builder.cvar($<Token>1));
                     }
                 | backref
                     {
@@ -5643,7 +5644,7 @@ xstring_contents: /* none */
             ssym: tSYMBEG sym
                     {
                         self.yylexer.lex_state.set(EXPR_END);
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.symbol($<Token>1, $<Token>2)
                         );
                     }
@@ -5658,7 +5659,7 @@ xstring_contents: /* none */
             dsym: tSYMBEG string_contents tSTRING_END
                     {
                         self.yylexer.lex_state.set(EXPR_END);
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.symbol_compose($<Token>1, $<NodeList>2, $<Token>3)
                         );
                     }
@@ -5670,7 +5671,7 @@ xstring_contents: /* none */
                     }
                 | tUMINUS_NUM simple_numeric   %prec tLOWEST
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.unary_num(
                                 $<Token>1,
                                 $<BoxedNode>2
@@ -5681,25 +5682,25 @@ xstring_contents: /* none */
 
   simple_numeric: tINTEGER
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.integer($<Token>1)
                         );
                     }
                 | tFLOAT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.float($<Token>1)
                         );
                     }
                 | tRATIONAL
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.rational($<Token>1)
                         );
                     }
                 | tIMAGINARY
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.complex($<Token>1)
                         );
                     }
@@ -5707,31 +5708,31 @@ xstring_contents: /* none */
 
    user_variable: tIDENTIFIER
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.lvar($<Token>1)
                         );
                     }
                 | tIVAR
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.ivar($<Token>1)
                         );
                     }
                 | tGVAR
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.gvar($<Token>1)
                         );
                     }
                 | tCONSTANT
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.const_($<Token>1)
                         );
                     }
                 | tCVAR
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.cvar($<Token>1)
                         );
                     }
@@ -5739,43 +5740,43 @@ xstring_contents: /* none */
 
 keyword_variable: kNIL
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.nil($<Token>1)
                         );
                     }
                 | kSELF
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.self_($<Token>1)
                         );
                     }
                 | kTRUE
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.true_($<Token>1)
                         );
                     }
                 | kFALSE
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.false_($<Token>1)
                         );
                     }
                 | k__FILE__
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.__file__($<Token>1)
                         );
                     }
                 | k__LINE__
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.__line__($<Token>1)
                         );
                     }
                 | k__ENCODING__
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.__encoding__($<Token>1)
                         );
                     }
@@ -5835,13 +5836,13 @@ keyword_variable: kNIL
                             }
                         }
 
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.accessible(node)
                         );
                     }
                 | keyword_variable
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.accessible($<BoxedNode>1)
                         );
                     }
@@ -5849,13 +5850,13 @@ keyword_variable: kNIL
 
          var_lhs: user_variable
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable($<BoxedNode>1)?
                         );
                     }
                 | keyword_variable
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.assignable($<BoxedNode>1)?
                         );
                     }
@@ -5863,13 +5864,13 @@ keyword_variable: kNIL
 
          backref: tNTH_REF
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.nth_ref($<Token>1)
                         );
                     }
                 | tBACK_REF
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.back_ref($<Token>1)
                         );
                     }
@@ -5879,7 +5880,7 @@ keyword_variable: kNIL
                     {
                         self.yylexer.lex_state.set(EXPR_BEG);
                         self.yylexer.command_start = true;
-                        $<None>$ = Value::None;
+                        $<None>$ = Value::new_none(self.arena);
                     }
                   expr_value term
                     {
@@ -5901,13 +5902,13 @@ f_opt_paren_args: f_paren_args
                     }
                 | none
                     {
-                        $$ = Value::MaybeNode(Maybe::none());
+                        $$ = Value::new_maybe_node(Maybe::none());
                     }
                 ;
 
     f_paren_args: tLPAREN2 f_args rparen
                     {
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.args(Maybe::some($<Token>1), $<NodeList>2, Maybe::some($<Token>3))
                         );
 
@@ -5919,7 +5920,7 @@ f_opt_paren_args: f_paren_args
                         let mut args = $<NodeList>2;
                         args.push(self.builder.forward_arg($<Token>4).unptr());
 
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.args(
                                 Maybe::some($<Token>1),
                                 args,
@@ -5933,7 +5934,7 @@ f_opt_paren_args: f_paren_args
                     }
                 | tLPAREN2 args_forward rparen
                     {
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             Maybe::some(
                                 self.builder.forward_only_args($<Token>1, $<Token>2, $<Token>3)
                             )
@@ -5950,14 +5951,14 @@ f_opt_paren_args: f_paren_args
                         $$ = $1;
                     }
                 |   {
-                        $<Bool>$ = Value::Bool(self.yylexer.in_kwarg);
+                        $<Bool>$ = Value::new_bool(self.yylexer.in_kwarg);
                         self.yylexer.in_kwarg = true;
                         self.yylexer.lex_state.set(self.yylexer.lex_state.get()|EXPR_LABEL);
                     }
                   f_args term
                     {
                         self.yylexer.in_kwarg = $<Bool>1;
-                        $$ = Value::MaybeNode(
+                        $$ = Value::new_maybe_node(
                             self.builder.args(Maybe::none(), $<NodeList>2, Maybe::none())
                         );
                         self.yylexer.lex_state.set(EXPR_BEG);
@@ -5975,25 +5976,25 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_kwrest);
                         nodes.append(&mut opt_f_block_arg);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_kwarg opt_f_block_arg
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>2);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_any_kwrest opt_f_block_arg
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>2);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_block_arg
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![ $<Node>1 ]
                             )
@@ -6007,7 +6008,7 @@ f_opt_paren_args: f_paren_args
                     }
                 | /* none */
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 ;
 
@@ -6023,7 +6024,7 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_rest_arg);
                         nodes.append(&mut opt_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg tCOMMA f_optarg tCOMMA f_rest_arg tCOMMA f_arg opt_args_tail
                     {
@@ -6039,7 +6040,7 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg tCOMMA f_optarg opt_args_tail
                     {
@@ -6051,7 +6052,7 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_optarg);
                         nodes.append(&mut opt_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg tCOMMA f_optarg tCOMMA f_arg opt_args_tail
                     {
@@ -6065,7 +6066,7 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg tCOMMA f_rest_arg opt_args_tail
                     {
@@ -6077,7 +6078,7 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_rest_arg);
                         nodes.append(&mut opt_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg tCOMMA f_rest_arg tCOMMA f_arg opt_args_tail
                     {
@@ -6091,14 +6092,14 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_arg opt_args_tail
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>2);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_optarg tCOMMA f_rest_arg opt_args_tail
                     {
@@ -6110,7 +6111,7 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_rest_arg);
                         nodes.append(&mut opt_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_optarg tCOMMA f_rest_arg tCOMMA f_arg opt_args_tail
                     {
@@ -6124,14 +6125,14 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_optarg opt_args_tail
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>2);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_optarg tCOMMA f_arg opt_args_tail
                     {
@@ -6143,14 +6144,14 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_rest_arg opt_args_tail
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.append(&mut $<NodeList>2);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | f_rest_arg tCOMMA f_arg opt_args_tail
                     {
@@ -6162,15 +6163,15 @@ f_opt_paren_args: f_paren_args
                         nodes.append(&mut f_arg);
                         nodes.append(&mut opt_args_tail);
 
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 | args_tail
                     {
-                        $$ = Value::NodeList($<NodeList>1);
+                        $$ = Value::new_node_list($<NodeList>1);
                     }
                 | /* none */
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 ;
 
@@ -6208,7 +6209,7 @@ f_opt_paren_args: f_paren_args
                         let name = clone_value(&ident_t);
                         self.static_env.declare(name.as_str());
                         self.max_numparam_stack.set_has_ordinary_params();
-                        $$ = Value::Token(ident_t);
+                        $$ = Value::new_token(ident_t);
                     }
                 ;
 
@@ -6217,20 +6218,20 @@ f_opt_paren_args: f_paren_args
                         let arg_t = $<Token>1;
                         let arg_name = String::from(clone_value(&arg_t));
                         self.current_arg_stack.set(Some(arg_name));
-                        $$ = Value::Token(arg_t);
+                        $$ = Value::new_token(arg_t);
                     }
                 ;
 
       f_arg_item: f_arg_asgn
                     {
                         self.current_arg_stack.set(None);
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.arg($<Token>1)?
                         );
                     }
                 | tLPAREN f_margs rparen
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.multi_lhs(
                                 Maybe::some($<Token>1),
                                 $<NodeList>2,
@@ -6242,13 +6243,13 @@ f_opt_paren_args: f_paren_args
 
            f_arg: f_arg_item
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | f_arg tCOMMA f_arg_item
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -6265,21 +6266,21 @@ f_opt_paren_args: f_paren_args
 
                         self.current_arg_stack.set(Some(ident));
 
-                        $$ = Value::Token(ident_t);
+                        $$ = Value::new_token(ident_t);
                     }
                 ;
 
             f_kw: f_label arg_value
                     {
                         self.current_arg_stack.set(None);
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.kwoptarg($<Token>1, $<BoxedNode>2)?
                         );
                     }
                 | f_label
                     {
                         self.current_arg_stack.set(None);
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.kwarg($<Token>1)?
                         );
                     }
@@ -6287,13 +6288,13 @@ f_opt_paren_args: f_paren_args
 
       f_block_kw: f_label primary_value
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.kwoptarg($<Token>1, $<BoxedNode>2)?
                         );
                     }
                 | f_label
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.kwarg($<Token>1)?
                         );
                     }
@@ -6301,26 +6302,26 @@ f_opt_paren_args: f_paren_args
 
    f_block_kwarg: f_block_kw
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | f_block_kwarg tCOMMA f_block_kw
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
 
          f_kwarg: f_kw
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | f_kwarg tCOMMA f_kw
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -6336,7 +6337,7 @@ f_opt_paren_args: f_paren_args
 
       f_no_kwarg: kwrest_mark kNIL
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     self.builder.kwnilarg(
@@ -6353,7 +6354,7 @@ f_opt_paren_args: f_paren_args
                     {
                         let ident_t = $<Token>2;
                         self.static_env.declare(clone_value(&ident_t).as_str());
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     (self.builder.kwrestarg($<Token>1, Maybe::some(ident_t))?).unptr()
@@ -6363,7 +6364,7 @@ f_opt_paren_args: f_paren_args
                     }
                 | kwrest_mark
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     (self.builder.kwrestarg($<Token>1, Maybe::none())?).unptr()
@@ -6376,7 +6377,7 @@ f_opt_paren_args: f_paren_args
            f_opt: f_arg_asgn tEQL arg_value
                     {
                         self.current_arg_stack.set(None);
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.optarg(
                                 $<Token>1,
                                 $<Token>2,
@@ -6389,7 +6390,7 @@ f_opt_paren_args: f_paren_args
      f_block_opt: f_arg_asgn tEQL primary_value
                     {
                         self.current_arg_stack.set(None);
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.optarg(
                                 $<Token>1,
                                 $<Token>2,
@@ -6401,25 +6402,25 @@ f_opt_paren_args: f_paren_args
 
   f_block_optarg: f_block_opt
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | f_block_optarg tCOMMA f_block_opt
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
         f_optarg: f_opt
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | f_optarg tCOMMA f_opt
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push( $<Node>3 );
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
@@ -6438,7 +6439,7 @@ f_opt_paren_args: f_paren_args
                         let ident_t = $<Token>2;
                         self.static_env.declare(clone_value(&ident_t).as_str());
 
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     (self.builder.restarg($<Token>1, Maybe::some(ident_t))?).unptr()
@@ -6448,7 +6449,7 @@ f_opt_paren_args: f_paren_args
                     }
                 | restarg_mark
                     {
-                        $$ = Value::NodeList(
+                        $$ = Value::new_node_list(
                             Box::new(
                                 list![
                                     (self.builder.restarg($<Token>1, Maybe::none())?).unptr()
@@ -6472,7 +6473,7 @@ f_opt_paren_args: f_paren_args
                     {
                         let ident_t = $<Token>2;
                         self.static_env.declare(clone_value(&ident_t).as_str());
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.blockarg($<Token>1, ident_t)?
                         );
                     }
@@ -6480,11 +6481,11 @@ f_opt_paren_args: f_paren_args
 
  opt_f_block_arg: tCOMMA f_block_arg
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>2 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>2 ]) );
                     }
                 | none
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 ;
 
@@ -6492,9 +6493,9 @@ f_opt_paren_args: f_paren_args
                     {
                         let var_ref = $<BoxedNode>1;
                         self.value_expr(&var_ref)?;
-                        $$ = Value::Node(var_ref);
+                        $$ = Value::new_node(var_ref);
                     }
-                | tLPAREN2 { self.yylexer.lex_state.set(EXPR_BEG); $<None>$ = Value::None; } expr rparen
+                | tLPAREN2 { self.yylexer.lex_state.set(EXPR_BEG); $<None>$ = Value::new_none(self.arena); } expr rparen
                     {
                         let expr = $<BoxedNode>3;
 
@@ -6519,13 +6520,13 @@ f_opt_paren_args: f_paren_args
                             self.value_expr(&expr)?
                         }
 
-                        $$ = Value::Node(expr);
+                        $$ = Value::new_node(expr);
                     }
                 ;
 
       assoc_list: none
                     {
-                        $$ = Value::NodeList( Box::new(list![]) );
+                        $$ = Value::new_node_list( Box::new(list![]) );
                     }
                 | assocs trailer
                     {
@@ -6535,19 +6536,19 @@ f_opt_paren_args: f_paren_args
 
           assocs: assoc
                     {
-                        $$ = Value::NodeList( Box::new(list![ $<Node>1 ]) );
+                        $$ = Value::new_node_list( Box::new(list![ $<Node>1 ]) );
                     }
                 | assocs tCOMMA assoc
                     {
                         let mut nodes = $<NodeList>1;
                         nodes.push($<Node>3);
-                        $$ = Value::NodeList(nodes);
+                        $$ = Value::new_node_list(nodes);
                     }
                 ;
 
            assoc: arg_value tASSOC arg_value
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.pair(
                                 $<BoxedNode>1,
                                 $<Token>2,
@@ -6557,7 +6558,7 @@ f_opt_paren_args: f_paren_args
                     }
                 | tLABEL arg_value
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.pair_keyword(
                                 $<Token>1,
                                 $<BoxedNode>2
@@ -6566,7 +6567,7 @@ f_opt_paren_args: f_paren_args
                     }
                 | tSTRING_BEG string_contents tLABEL_END arg_value
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.pair_quoted(
                                 $<Token>1,
                                 $<NodeList>2,
@@ -6577,7 +6578,7 @@ f_opt_paren_args: f_paren_args
                     }
                 | tDSTAR arg_value
                     {
-                        $$ = Value::Node(
+                        $$ = Value::new_node(
                             self.builder.kwsplat($<Token>1, $<BoxedNode>2)
                         );
                     }
@@ -6661,21 +6662,21 @@ f_opt_paren_args: f_paren_args
 
        opt_terms: /* none */
                     {
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
                     }
                 | terms
                     {
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
                     }
                 ;
 
           opt_nl: /* none */
                     {
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
                     }
                 | tNL
                     {
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
                     }
                 ;
 
@@ -6699,15 +6700,15 @@ f_opt_paren_args: f_paren_args
 
          trailer: /* none */
                     {
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
                     }
                 | tNL
                     {
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
                     }
                 | tCOMMA
                     {
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
                     }
                 ;
 
@@ -6723,29 +6724,29 @@ f_opt_paren_args: f_paren_args
 
            terms: term
                     {
-                        $$ = Value::TokenList( Box::new(list![]) );
+                        $$ = Value::new_token_list( list![] );
                     }
                 | terms tSEMI
                     {
-                        $$ = Value::TokenList( Box::new(list![]) );
+                        $$ = Value::new_token_list( list![] );
                     }
                 ;
 
             none: /* empty */
                   {
-                        $$ = Value::None;
+                        $$ = Value::new_none(self.arena);
                   }
                 ;
 
 %%
 
-impl Parser {
+impl<'a /*'*/> Parser<'a /*'*/> {
     /// Constructs a parser with given `input` and `options`.
     ///
     /// Returns an error if given `input` is invalid.
-    pub fn new<TInput>(input: TInput, options: ParserOptions) -> Self
+    pub fn new<TInput>(bump: &'a /*'*/ bumpalo::Bump, input: TInput, options: ParserOptions) -> Self
     where
-        TInput: Into<List<u8>>
+        TInput: Into<List<'a /*'*/, u8>>
     {
         let InternalParserOptions {
             buffer_name,
@@ -6765,12 +6766,13 @@ impl Parser {
         let input: List<u8> = input.into();
         let buffer_name: StringPtr = buffer_name;
 
-        let mut lexer = Lexer::new(input, buffer_name, decoder);
+        let mut lexer = Lexer::new(bump, input, buffer_name, decoder);
         lexer.context = context.clone();
         lexer.static_env = static_env.clone();
         lexer.diagnostics = diagnostics.clone();
 
         let builder = Builder::new(
+            bump,
             static_env.clone(),
             context.clone(),
             current_arg_stack.clone(),
@@ -6787,6 +6789,7 @@ impl Parser {
             yynerrs: 0,
             yyerrstatus_: 0,
             result: Maybe::none(),
+            bump,
 
             builder,
             context,
@@ -6811,7 +6814,7 @@ impl Parser {
     /// 3. diagnostics
     /// 4. coments
     /// 5. magic comments
-    pub fn do_parse(mut self) -> ParserResult  {
+    pub fn do_parse(mut self) -> ParserResult<'a /*'*/>  {
         self.parse();
 
         ParserResult::new(
@@ -6825,7 +6828,7 @@ impl Parser {
     }
 
     #[doc(hidden)]
-    pub fn do_parse_with_state_validation(mut self) -> ParserResult {
+    pub fn do_parse_with_state_validation(mut self) -> ParserResult<'a /*'*/> {
         self.parse();
 
         self.assert_state_is_final();
@@ -6853,7 +6856,7 @@ impl Parser {
         self.yylexer.yylex()
     }
 
-    fn next_token(&mut self) -> Ptr<Token> {
+    fn next_token(&mut self) -> &'a /*'*/ Token<'a /*'*/> {
         let mut token = self.yylex();
 
         if let Some(token_rewriter) = self.token_rewriter.as_ref() {
@@ -6880,7 +6883,7 @@ impl Parser {
         self.last_token_type = token.token_type();
 
         if self.record_tokens {
-            self.tokens.push(token.clone().unptr());
+            self.tokens.push(token);
         }
 
         token

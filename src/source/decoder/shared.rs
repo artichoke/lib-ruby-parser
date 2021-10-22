@@ -1,17 +1,17 @@
 #[cfg(test)]
 pub(crate) mod dummy_decoder {
     use crate::source::{Decoder, DecoderResult, InputError};
-    crate::use_native_or_external!(List);
-    crate::use_native_or_external!(StringPtr);
+    crate::use_native_or_external!(Vec);
+    crate::use_native_or_external!(String);
 
-    pub(crate) fn decoded_output() -> List<u8> {
-        crate::use_native_or_external!(List);
+    pub(crate) fn decoded_output<'a>(bump: &'a Bump) -> Vec<'a, u8> {
+        crate::use_native_or_external!(Vec);
 
-        list![b'3', b'+', b'3']
+        bump_vec![in bump; b'3', b'+', b'3']
     }
 
-    pub(crate) fn decoding_error() -> InputError {
-        InputError::new_decoding_error(StringPtr::from("foo"))
+    pub(crate) fn decoding_error<'a>(bump: &'a Bump) -> InputError<'a> {
+        InputError::new_decoding_error(String::from_str_in("foo", bump))
     }
 
     #[cfg(feature = "compile-with-external-structures")]
@@ -45,32 +45,52 @@ pub(crate) mod dummy_decoder {
 
     #[cfg(not(feature = "compile-with-external-structures"))]
     mod implementation {
+        use bumpalo::Bump;
+
         use super::{decoded_output, decoding_error};
         use crate::source::{Decoder, DecoderResult};
+        crate::use_native_or_external!(Vec);
+        crate::use_native_or_external!(String);
 
-        fn decode_ok(_encoding: String, _input: Vec<u8>) -> DecoderResult {
-            DecoderResult::Ok(decoded_output())
+        fn decode_ok<'a>(
+            bump: &'a Bump,
+            _encoding: String<'a>,
+            _input: Vec<'a, u8>,
+        ) -> DecoderResult<'a> {
+            DecoderResult::Ok(decoded_output(bump))
         }
 
-        fn decode_err(_encoding: String, _input: Vec<u8>) -> DecoderResult {
-            DecoderResult::Err(decoding_error())
+        fn decode_err<'a>(
+            bump: &'a Bump,
+            _encoding: String,
+            _input: Vec<'a, u8>,
+        ) -> DecoderResult<'a> {
+            DecoderResult::Err(decoding_error(bump))
         }
 
-        pub(crate) fn ok_decoder() -> Decoder {
-            Decoder::new(Box::new(decode_ok))
+        pub(crate) fn ok_decoder<'a>(bump: &'a Bump) -> Decoder<'a> {
+            Decoder::new(Box::new(move |encoding, input| {
+                decode_ok(bump, encoding, input)
+            }))
         }
 
-        pub(crate) fn err_decoder() -> Decoder {
-            Decoder::new(Box::new(decode_err))
+        pub(crate) fn err_decoder<'a>(bump: &'a Bump) -> Decoder<'a> {
+            Decoder::new(Box::new(move |encoding, input| {
+                decode_err(bump, encoding, input)
+            }))
         }
     }
 
+    use bumpalo::Bump;
     pub(crate) use implementation::{err_decoder, ok_decoder};
 
-    pub(crate) fn call_dummy_decoder(decoder: Decoder) -> DecoderResult {
+    pub(crate) fn call_dummy_decoder<'a>(
+        bump: &'a Bump,
+        decoder: Decoder<'a>,
+    ) -> DecoderResult<'a> {
         // it's dummy, so encoding/input doesn't matter
-        let encoding = StringPtr::from("UTF-8");
-        let input = list![b'2', b'+', b'2'];
+        let encoding = String::from_str_in("UTF-8", &bump);
+        let input = bump_vec![in &bump; b'2', b'+', b'2'];
 
         decoder.call(encoding, input)
     }

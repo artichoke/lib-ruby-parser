@@ -51,8 +51,8 @@ pub(crate) trait Visit<TItem> {
     fn visit(&mut self, item: TItem, visit_as: Item);
 }
 
-impl<TObserver: Observer> Visit<&[Node]> for Visitor<TObserver> {
-    fn visit(&mut self, nodes: &[Node], visit_as: Item) {
+impl<'a, TObserver: Observer> Visit<&'a [&'a Node<'a>]> for Visitor<TObserver> {
+    fn visit(&mut self, nodes: &'a [&'a Node<'a>], visit_as: Item) {
         self.observer.on_subitem(visit_as);
         self.observer.on_node_list(nodes);
 
@@ -64,22 +64,22 @@ impl<TObserver: Observer> Visit<&[Node]> for Visitor<TObserver> {
     }
 }
 
-impl<TObserver: Observer> Visit<&List<Node>> for Visitor<TObserver> {
-    fn visit(&mut self, nodes: &List<Node>, visit_as: Item) {
+impl<'a, TObserver: Observer> Visit<&'a List<'a, &'a Node<'a>>> for Visitor<TObserver> {
+    fn visit(&mut self, nodes: &'a List<'a, &'a Node<'a>>, visit_as: Item) {
         let nodes: &[Node] = nodes;
         self.visit(nodes, visit_as);
     }
 }
 
-impl<TObserver: Observer> Visit<&Ptr<Node>> for Visitor<TObserver> {
-    fn visit(&mut self, node: &Ptr<Node>, visit_as: Item) {
-        let node: &Node = &*node;
-        self.visit(node, visit_as);
-    }
-}
+// impl<'a, TObserver: Observer> Visit<&'a Node<'a>> for Visitor<TObserver> {
+//     fn visit(&mut self, node: &'a Node<'a>, visit_as: Item) {
+//         let node: &Node = &*node;
+//         self.visit(node, visit_as);
+//     }
+// }
 
-impl<TObserver: Observer> Visit<&Maybe<Ptr<Node>>> for Visitor<TObserver> {
-    fn visit(&mut self, node: &Maybe<Ptr<Node>>, visit_as: Item) {
+impl<'a, TObserver: Observer> Visit<&Maybe<&'a Node<'a>>> for Visitor<TObserver> {
+    fn visit(&mut self, node: &Maybe<&'a Node<'a>>, visit_as: Item) {
         if let Some(node) = node.as_ref() {
             self.visit(node, visit_as);
         }

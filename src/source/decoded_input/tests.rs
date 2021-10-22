@@ -1,32 +1,41 @@
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(Vec);
+crate::use_native_or_external!(String);
+
+use bumpalo::Bump;
 
 use super::DecodedInput;
 use crate::source::SourceLine;
 
 #[test]
 fn test_new() {
-    let decoded = DecodedInput::named("foo");
+    let bump = Bump::new();
+    let decoded = DecodedInput::named(&bump, String::from_str_in("foo", &bump));
     assert_eq!(decoded.name(), "foo");
 }
 
-fn decoded_input() -> DecodedInput {
-    let mut decoded = DecodedInput::named("foo");
-    decoded.set_bytes(list![1, 2, 3]);
-    decoded.set_lines(list![SourceLine::new(1, 2, true)]);
+fn decoded_input<'a>(bump: &'a Bump) -> DecodedInput<'a> {
+    let mut decoded = DecodedInput::named(&bump, String::from_str_in("foo", &bump));
+    decoded.set_bytes(bump_vec![in &bump; 1, 2, 3]);
+    decoded.set_lines(bump_vec![in &bump; SourceLine::new(1, 2, true)]);
     decoded
 }
 
 #[test]
 fn test_settter() {
-    let decoded = decoded_input();
+    let bump = Bump::new();
+    let decoded = decoded_input(&bump);
 
-    assert_eq!(decoded.bytes(), &vec![1, 2, 3]);
-    assert_eq!(decoded.lines(), &vec![SourceLine::new(1, 2, true)]);
+    assert_eq!(decoded.bytes(), &bump_vec![in &bump; 1, 2, 3]);
+    assert_eq!(
+        decoded.lines(),
+        &bump_vec![in &bump; SourceLine::new(1, 2, true)]
+    );
 }
 
 #[test]
 fn test_debug() {
-    let decoded = decoded_input();
+    let bump = Bump::new();
+    let decoded = decoded_input(&bump);
 
     assert_eq!(
         format!("{:?}", decoded),
@@ -36,15 +45,17 @@ fn test_debug() {
 
 #[test]
 fn test_take_bytes() {
-    let mut decoded = decoded_input();
+    let bump = Bump::new();
+    let mut decoded = decoded_input(&bump);
 
-    assert_eq!(decoded.take_bytes(), vec![1, 2, 3]);
-    assert_eq!(decoded.take_bytes(), vec![]);
+    assert_eq!(decoded.take_bytes(), bump_vec![in &bump; 1, 2, 3]);
+    assert_eq!(decoded.take_bytes(), bump_vec![in &bump; ]);
 }
 
 #[test]
 fn test_into_bytes() {
-    let decoded = decoded_input();
+    let bump = Bump::new();
+    let decoded = decoded_input(&bump);
 
-    assert_eq!(decoded.into_bytes(), vec![1, 2, 3]);
+    assert_eq!(decoded.into_bytes(), bump_vec![in &bump; 1, 2, 3]);
 }

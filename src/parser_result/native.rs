@@ -8,24 +8,24 @@ use crate::Token;
 /// Combination of all data that `Parser` can give you
 #[derive(Debug)]
 #[repr(C)]
-pub struct ParserResult {
+pub struct ParserResult<'a> {
     /// Abstract Syntax Tree that was constructed from you code.
     /// Contains `None` if the code gives no AST nodes
-    pub ast: Option<Box<Node>>,
+    pub ast: Option<&'a Node<'a>>,
 
     /// List of tokens returned by a Lexer and consumed by a Parser.
     /// Empty unless ParserOptions::record_tokens is set to true.
-    pub tokens: Vec<Token>,
+    pub tokens: bumpalo::collections::Vec<'a, &'a Token<'a>>,
 
     /// List of all diagnostics (errors and warings) that have been
     /// recorded during lexing and parsing
-    pub diagnostics: Vec<Diagnostic>,
+    pub diagnostics: bumpalo::collections::Vec<'a, &'a Diagnostic>,
 
     /// List of comments extracted from the source code.
-    pub comments: Vec<Comment>,
+    pub comments: bumpalo::collections::Vec<'a, &'a Comment>,
 
     /// List of magic comments extracted from the source code.
-    pub magic_comments: Vec<MagicComment>,
+    pub magic_comments: bumpalo::collections::Vec<'a, &'a MagicComment>,
 
     /// Input that was used for parsing.
     ///
@@ -36,16 +36,16 @@ pub struct ParserResult {
     ///
     /// Pass **this** data to `Loc::source`, otherwise you'll get
     /// incorrect source ranges.
-    pub input: DecodedInput,
+    pub input: DecodedInput<'a>,
 }
 
-impl ParserResult {
+impl<'a> ParserResult<'a> {
     pub(crate) fn new(
-        ast: Option<Box<Node>>,
-        tokens: Vec<Token>,
-        diagnostics: Vec<Diagnostic>,
-        comments: Vec<Comment>,
-        magic_comments: Vec<MagicComment>,
+        ast: Option<&'a Node<'a>>,
+        tokens: bumpalo::collections::Vec<'a, &'a Token<'a>>,
+        diagnostics: bumpalo::collections::Vec<'a, &'a Diagnostic>,
+        comments: bumpalo::collections::Vec<'a, &'a Comment>,
+        magic_comments: bumpalo::collections::Vec<'a, &'a MagicComment>,
         input: DecodedInput,
     ) -> Self {
         Self {
@@ -59,23 +59,23 @@ impl ParserResult {
     }
 
     /// Returns `ast` attribute
-    pub fn ast(&self) -> &Option<Box<Node>> {
+    pub fn ast(&self) -> &Option<&'a Node<'a>> {
         &self.ast
     }
     /// Returns `tokens` attribute
-    pub fn tokens(&self) -> &Vec<Token> {
+    pub fn tokens(&self) -> &bumpalo::collections::Vec<'a, &'a Token<'a>> {
         &self.tokens
     }
     /// Returns `diagnostics` attribute
-    pub fn diagnostics(&self) -> &Vec<Diagnostic> {
+    pub fn diagnostics(&self) -> &bumpalo::collections::Vec<'a, &'a Diagnostic> {
         &self.diagnostics
     }
     /// Returns `comments` attribute
-    pub fn comments(&self) -> &Vec<Comment> {
+    pub fn comments(&self) -> &bumpalo::collections::Vec<'a, &'a Comment> {
         &self.comments
     }
     /// Returns `magic_comments` attribute
-    pub fn magic_comments(&self) -> &Vec<MagicComment> {
+    pub fn magic_comments(&self) -> &bumpalo::collections::Vec<'a, &'a MagicComment> {
         &self.magic_comments
     }
     /// Returns `input` attribute

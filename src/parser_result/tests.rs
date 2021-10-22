@@ -10,11 +10,11 @@ crate::use_native_or_external!(Maybe);
 crate::use_native_or_external!(List);
 crate::use_native_or_external!(Ptr);
 
-fn ast() -> Maybe<Ptr<Node>> {
+fn ast<'a>(bump: &'a bumpalo::Bump) -> Maybe<&'a Node<'a>> {
     Maybe::some(Ptr::new(Node::new_retry(Loc::new(1, 2))))
 }
 
-fn tokens() -> List<Token> {
+fn tokens<'a>(bump: &'a bumpalo::Bump) -> List<Token<'a>> {
     list![Token::new(
         280,
         Bytes::new(list![97, 98, 99]),
@@ -24,7 +24,7 @@ fn tokens() -> List<Token> {
     )]
 }
 
-fn diagnostics() -> List<Diagnostic> {
+fn diagnostics<'a>(bump: &'a bumpalo::Bump) -> List<Diagnostic> {
     list![Diagnostic::new(
         ErrorLevel::error(),
         DiagnosticMessage::new_alias_nth_ref(),
@@ -32,44 +32,46 @@ fn diagnostics() -> List<Diagnostic> {
     )]
 }
 
-fn comments() -> List<Comment> {
+fn comments<'a>(bump: &'a bumpalo::Bump) -> List<Comment> {
     list![Comment::make(Loc::new(7, 8), CommentType::inline())]
 }
-fn magic_comments() -> List<MagicComment> {
+fn magic_comments<'a>(bump: &'a bumpalo::Bump) -> List<MagicComment> {
     list![MagicComment::new(
         MagicCommentKind::warn_indent(),
         Loc::new(9, 10),
         Loc::new(11, 12),
     )]
 }
-fn input() -> DecodedInput {
+fn input<'a>(bump: &'a bumpalo::Bump) -> DecodedInput<'a> {
     let mut input = DecodedInput::named("foo");
     input.set_bytes(list![1, 2, 3]);
     input.set_lines(list![SourceLine::new(1, 2, false)]);
     input
 }
 
-fn parser_options() -> ParserResult {
+fn parser_options<'a>(bump: &'a bumpalo::Bump) -> ParserResult<'a> {
     ParserResult::new(
-        ast(),
-        tokens(),
-        diagnostics(),
-        comments(),
-        magic_comments(),
-        input(),
+        ast(bump),
+        tokens(bump),
+        diagnostics(bump),
+        comments(bump),
+        magic_comments(bump),
+        input(bump),
     )
 }
 
 #[test]
 fn test_new() {
-    let parser_options = parser_options();
+    let bump = bumpalo::Bump::new();
+    let parser_options = parser_options(&bump);
     drop(parser_options);
 }
 
 #[test]
 fn test_debug() {
+    let bump = bumpalo::Bump::new();
     assert_eq!(
-        format!("{:?}", parser_options()),
+        format!("{:?}", parser_options(&bump)),
         "ParserResult { \
 ast: Some(Retry(Retry { expression_l: 1...2 })), \
 tokens: [[kIN, \"abc\", 3...4]], \
@@ -83,11 +85,12 @@ input: DecodedInput { name: \"foo\", lines: [SourceLine { start: 1, end: 2, ends
 
 #[test]
 fn test_getters() {
-    let parser_options = parser_options();
+    let bump = bumpalo::Bump::new();
+    let parser_options = parser_options(&bump);
 
-    assert_eq!(parser_options.ast(), &ast());
-    assert_eq!(parser_options.tokens(), &tokens());
-    assert_eq!(parser_options.diagnostics(), &diagnostics());
-    assert_eq!(parser_options.comments(), &comments());
-    assert_eq!(parser_options.magic_comments(), &magic_comments());
+    assert_eq!(parser_options.ast(), &ast(&bump));
+    assert_eq!(parser_options.tokens(), &tokens(&bump));
+    assert_eq!(parser_options.diagnostics(), &diagnostics(&bump));
+    assert_eq!(parser_options.comments(), &comments(&bump));
+    assert_eq!(parser_options.magic_comments(), &magic_comments(&bump));
 }

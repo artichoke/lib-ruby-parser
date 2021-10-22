@@ -1,11 +1,12 @@
 use crate::source::token_rewriter::TokenRewriter;
 use crate::source::Decoder;
+crate::use_native_or_external!(String);
 
 /// Configuration of the parser
 #[derive(Debug)]
-pub struct ParserOptions {
+pub struct ParserOptions<'a> {
     /// Name of the buffer. Used in all diagnostic messages
-    pub buffer_name: String,
+    pub buffer_name: String<'a>,
 
     /// Custom decoder that can be used if the source is encoded
     /// in unknown encoding. Only UTF-8 and ASCII-8BIT/BINARY are
@@ -39,7 +40,7 @@ pub struct ParserOptions {
     ///     "decoded".to_string()
     /// )
     /// ```
-    pub decoder: Option<Decoder>,
+    pub decoder: Option<Decoder<'a>>,
 
     /// Optional token rewriter, see TokenRewriter API
     ///
@@ -78,7 +79,7 @@ pub struct ParserOptions {
     /// };
     /// assert_eq!(*lvar_name, String::from("bar"));
     /// ```
-    pub token_rewriter: Option<TokenRewriter>,
+    pub token_rewriter: Option<TokenRewriter<'a>>,
 
     /// When set to true Parser records tokens.
     /// When set to false `ParserResult.tokens` is guaranteed to be empty.
@@ -86,12 +87,12 @@ pub struct ParserOptions {
     pub record_tokens: bool,
 }
 
-impl ParserOptions {
+impl<'a> ParserOptions<'a> {
     /// Constructs new ParserOptions
     pub fn new(
-        buffer_name: String,
-        decoder: Option<Decoder>,
-        token_rewriter: Option<TokenRewriter>,
+        buffer_name: String<'a>,
+        decoder: Option<Decoder<'a>>,
+        token_rewriter: Option<TokenRewriter<'a>>,
         record_tokens: bool,
     ) -> Self {
         Self {
@@ -104,8 +105,8 @@ impl ParserOptions {
 }
 
 use super::InternalParserOptions;
-impl From<ParserOptions> for InternalParserOptions {
-    fn from(options: ParserOptions) -> Self {
+impl<'a> From<ParserOptions<'a>> for InternalParserOptions<'a> {
+    fn from(options: ParserOptions<'a>) -> Self {
         let ParserOptions {
             buffer_name,
             decoder,

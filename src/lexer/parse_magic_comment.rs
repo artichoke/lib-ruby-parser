@@ -20,7 +20,7 @@ const MAGIC_COMMENTS: &[MagicCommentData] = &[
     ("warn_indent", MagicCommentKind::warn_indent),
 ];
 
-impl Lexer {
+impl Lexer<'_> {
     pub(crate) fn comment_at_top(&self) -> bool {
         let mut ptr = self.buffer.pbeg;
         let ptr_end = self.buffer.pcur - 1;

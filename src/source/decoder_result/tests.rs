@@ -1,12 +1,15 @@
-crate::use_native_or_external!(StringPtr);
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(String);
+crate::use_native_or_external!(Vec);
+
+use bumpalo::Bump;
 
 use super::DecoderResult;
 use crate::source::InputError;
 
 #[test]
 fn test_ok() {
-    let output = list![1, 2, 3];
+    let bump = Bump::new();
+    let output = bump_vec![in &bump; 1, 2, 3];
     let ok_result = DecoderResult::new_ok(output.clone());
 
     assert!(ok_result.is_ok());
@@ -19,7 +22,8 @@ fn test_ok() {
 
 #[test]
 fn test_err() {
-    let err = InputError::new_unsupported_encoding(StringPtr::from("foo"));
+    let bump = Bump::new();
+    let err = InputError::new_unsupported_encoding(String::from_str_in("foo", &bump));
     let err_result = DecoderResult::new_err(err.clone());
 
     assert!(!err_result.is_ok());

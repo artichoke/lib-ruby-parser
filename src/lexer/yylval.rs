@@ -3,7 +3,7 @@ use crate::lexer::*;
 use crate::Bytes;
 use crate::TokenBuf;
 
-impl Lexer {
+impl Lexer<'_> {
     pub(crate) fn set_yylval_id(&mut self, id: &str) {
         if cfg!(feature = "debug-lexer") {
             println!("set_yylval_id({})", id);

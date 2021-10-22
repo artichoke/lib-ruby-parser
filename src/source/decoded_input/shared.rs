@@ -1,14 +1,14 @@
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(Vec);
 crate::use_native_or_external!(SharedByteList);
 
 use super::DecodedInput;
 use crate::source::SourceLine;
 
-impl DecodedInput {
+impl<'a> DecodedInput<'a> {
     /// Populates `Input` with a given byte array
-    pub fn update_bytes(&mut self, bytes: List<u8>) {
+    pub fn update_bytes(&mut self, bytes: Vec<'a, u8>) {
         let mut line = SourceLine::new(0, 0, true);
-        let mut lines = list![];
+        let mut lines = Vec::new_in(self.bump);
 
         for (idx, c) in bytes.iter().enumerate() {
             line.set_end(idx + 1);

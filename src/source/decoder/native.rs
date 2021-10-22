@@ -1,5 +1,7 @@
 use crate::source::DecoderResult;
 use crate::source::InputError;
+crate::use_native_or_external!(String);
+crate::use_native_or_external!(Vec);
 
 /// Decoder is what is used if input source has encoding
 /// that is not supported out of the box.
@@ -23,32 +25,36 @@ use crate::source::InputError;
 /// Takes encoding name and initial input as arguments
 /// and returns `Ok(decoded)` vector of bytes or `Err(error)` that will be returned
 /// in the `ParserResult::diagnostics` vector.
-pub type DecoderFn = dyn Fn(String, Vec<u8>) -> DecoderResult;
+pub type DecoderFn<'a> = dyn (Fn(String<'a>, Vec<'a, u8>) -> DecoderResult<'a>) + 'a;
 
 /// Custom decoder, a wrapper around a function
-pub struct Decoder {
-    f: Box<DecoderFn>,
+pub struct Decoder<'a> {
+    f: Box<DecoderFn<'a>>,
 }
 
-impl Decoder {
+impl<'a> Decoder<'a> {
     /// Constructs a rewriter based on a given function
-    pub fn new(f: Box<DecoderFn>) -> Self {
+    pub fn new(f: Box<DecoderFn<'a>>) -> Self {
         Self { f }
     }
 
-    pub(crate) fn call(&self, encoding: String, input: Vec<u8>) -> DecoderResult {
+    pub(crate) fn call(&self, encoding: String<'a>, input: Vec<'a, u8>) -> DecoderResult<'a> {
         let f = &*self.f;
         f(encoding, input)
     }
 }
 
-impl std::fmt::Debug for Decoder {
+impl std::fmt::Debug for Decoder<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Decoder").finish()
     }
 }
 
-pub fn decode_input(input: Vec<u8>, enc: String, decoder: &mut Option<Decoder>) -> DecoderResult {
+pub fn decode_input<'a>(
+    input: Vec<'a, u8>,
+    enc: String<'a>,
+    decoder: &mut Option<Decoder<'a>>,
+) -> DecoderResult<'a> {
     match enc.to_uppercase().as_str() {
         "UTF-8" | "ASCII-8BIT" | "BINARY" => {
             return DecoderResult::Ok(input.into());

@@ -1,6 +1,6 @@
 use crate::error::DiagnosticMessage;
 
-impl DiagnosticMessage {
+impl<'a> DiagnosticMessage<'a> {
     /// Renders DiagnosticMessage by interpolating all dynamic values into a template
     pub fn render(&self) -> String {
         // Lexer errors

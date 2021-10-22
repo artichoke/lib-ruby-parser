@@ -7,9 +7,9 @@ use super::variants::*;
 /// Enum of all possible diagnostic message (both warnings and errors)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(missing_docs)]
-pub enum DiagnosticMessage {
+pub enum DiagnosticMessage<'a> {
 {{ each message }}<dnl>
-    {{ helper message-camelcase-name }}({{ helper message-camelcase-name }}),
+    {{ helper message-camelcase-name }}({{ helper message-camelcase-name }}{{ helper message-generic-lifetime }}),
 {{ end }}<dnl>
 }
 ";

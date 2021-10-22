@@ -1,8 +1,11 @@
+use bumpalo::Bump;
+
 use super::Diagnostic;
 use crate::{DiagnosticMessage, ErrorLevel, Loc};
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(Vec);
+crate::use_native_or_external!(String);
 
-fn new_diagnostic() -> Diagnostic {
+fn new_diagnostic<'a>() -> Diagnostic<'a> {
     Diagnostic::new(
         ErrorLevel::error(),
         DiagnosticMessage::new_alias_nth_ref(),
@@ -34,9 +37,11 @@ fn test_get_loc() {
 
 #[test]
 fn test_renders() {
+    let bump = Bump::new();
     let source = "line 1\nvery long line 2\n";
-    let mut input = crate::source::DecodedInput::named("(test_render)");
-    input.update_bytes(List::from(source));
+    let mut input =
+        crate::source::DecodedInput::named(&bump, String::from_str_in("(test_render)", &bump));
+    input.update_bytes(Vec::from_iter_in(source.bytes(), &bump));
 
     let error = Diagnostic::new(
         ErrorLevel::warning(),

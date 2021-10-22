@@ -18,8 +18,9 @@ impl Loc {
     }
 
     /// Returns a new `Loc` with given `begin` and current `end`
-    pub fn with_begin(&self, begin: usize) -> Loc {
-        Self::new(begin, self.end())
+    pub fn with_begin(&self, begin: usize) -> &Loc {
+        // Self::new(begin, self.end())
+        todo!()
     }
 
     /// Returns a new `Loc` with given `end` and current `begin`

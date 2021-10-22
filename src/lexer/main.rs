@@ -23,14 +23,16 @@ use crate::{Diagnostic, DiagnosticMessage, ErrorLevel};
 /// A struct responsible for converting a given input
 /// into a sequence of tokens
 #[derive(Debug, Default)]
-pub struct Lexer {
-    pub(crate) buffer: Buffer,
+pub struct Lexer<'a> {
+    pub(crate) bump: &'a bumpalo::Bump,
 
-    pub(crate) lval: Option<Bytes>,
+    pub(crate) buffer: Buffer<'a>,
+
+    pub(crate) lval: Option<Bytes<'a>>,
     pub(crate) lval_start: Option<usize>,
     pub(crate) lval_end: Option<usize>,
 
-    pub(crate) strterm: Option<Box<StrTerm>>,
+    pub(crate) strterm: Option<&'a StrTerm>,
     /// Current state of the lexer, used internally for testing
     pub lex_state: LexState,
     pub(crate) paren_nest: i32,
@@ -44,7 +46,7 @@ pub struct Lexer {
     /// exposed for internal testing
     pub cmdarg: StackState,
 
-    pub(crate) tokenbuf: TokenBuf,
+    pub(crate) tokenbuf: TokenBuf<'a>,
 
     // pub(crate) max_numparam: usize,
     pub(crate) context: Context,
@@ -81,11 +83,11 @@ pub struct Lexer {
     pub static_env: StaticEnvironment,
 
     pub(crate) diagnostics: Diagnostics,
-    pub(crate) comments: List<Comment>,
-    pub(crate) magic_comments: List<MagicComment>,
+    pub(crate) comments: bumpalo::collections::Vec<'a, Comment>,
+    pub(crate) magic_comments: bumpalo::collections::Vec<'a, MagicComment>,
 }
 
-impl Lexer {
+impl<'a> Lexer<'a> {
     pub(crate) const NULL_CHAR: u8 = 0x00;
     pub(crate) const CTRL_D_CHAR: u8 = 0x04;
     pub(crate) const CTRL_Z_CHAR: u8 = 0x1a;
@@ -95,7 +97,7 @@ impl Lexer {
     /// Constructs an instance of Lexer
     pub fn new<Bytes, Name>(bytes: Bytes, name: Name, decoder: Maybe<Decoder>) -> Self
     where
-        Bytes: Into<List<u8>>,
+        Bytes: Into<List<'a, u8>>,
         Name: Into<StringPtr>,
     {
         Self {
@@ -128,7 +130,7 @@ impl Lexer {
         tokens
     }
 
-    pub(crate) fn yylex(&mut self) -> Ptr<Token> {
+    pub(crate) fn yylex(&mut self) -> &'a Token {
         let lex_state_before = self.lex_state;
         self.lval = None;
 
@@ -153,7 +155,7 @@ impl Lexer {
             end = begin + 1;
         }
 
-        let token = Ptr::new(Token::new(
+        let token = self.bump.alloc(Token::new(
             token_type,
             token_value,
             Loc::new(begin, end),

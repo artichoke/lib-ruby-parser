@@ -1,12 +1,14 @@
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(Vec);
+use bumpalo::Bump;
+
 use super::Diagnostic;
 use crate::source::DecodedInput;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-impl Diagnostic {
+impl<'a> Diagnostic<'a> {
     /// Returns rendered message
-    pub fn render_message(&self) -> String {
+    pub fn render_message(&self) -> std::string::String {
         self.message().render()
     }
 
@@ -61,23 +63,25 @@ impl Diagnostic {
     }
 }
 
-#[derive(Debug, Default, Clone)]
-pub(crate) struct Diagnostics {
-    list: Rc<RefCell<List<Diagnostic>>>,
+#[derive(Debug, Clone)]
+pub(crate) struct Diagnostics<'a> {
+    bump: &'a Bump,
+    list: Rc<RefCell<Vec<'a, Diagnostic<'a>>>>,
 }
 
-impl Diagnostics {
-    pub(crate) fn new() -> Self {
+impl<'a> Diagnostics<'a> {
+    pub(crate) fn new(bump: &'a Bump) -> Self {
         Self {
-            list: Rc::new(RefCell::new(list![])),
+            bump,
+            list: Rc::new(RefCell::new(Vec::new_in(bump))),
         }
     }
 
-    pub(crate) fn emit(&self, diagnostic: Diagnostic) {
+    pub(crate) fn emit(&self, diagnostic: Diagnostic<'a>) {
         self.list.borrow_mut().push(diagnostic)
     }
 
-    pub(crate) fn take_inner(self) -> List<Diagnostic> {
-        self.list.replace(list![])
+    pub(crate) fn take_inner(self) -> Vec<'a, Diagnostic<'a>> {
+        self.list.replace(Vec::new_in(self.bump))
     }
 }

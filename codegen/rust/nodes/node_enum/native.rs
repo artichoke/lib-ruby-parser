@@ -7,22 +7,22 @@ use crate::nodes::*;
 use crate::Loc;
 use crate::Bytes;
 crate::use_native_or_external!(Ptr);
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(Vec);
 crate::use_native_or_external!(Maybe);
-crate::use_native_or_external!(StringPtr);
+crate::use_native_or_external!(String);
 
 /// Generic combination of all known nodes.
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq)]
 #[repr(C)]
-pub enum Node {
+pub enum Node<'a> {
 {{ each node }}<dnl>
-    {{ helper node-rust-camelcase-name }}({{ helper node-rust-camelcase-name }}),
+    {{ helper node-rust-camelcase-name }}({{ helper node-rust-camelcase-name }}{{ helper node-generic-lifetime }}),
 {{ end }}<dnl>
 }
 
-impl Node {
-    pub(crate) fn inner_ref(&self) -> &dyn InnerNode {
+impl<'a> Node<'a> {
+    pub(crate) fn inner_ref(&'a self) -> &'a dyn InnerNode {
         match &self {
 {{ each node }}<dnl>
             Node::{{ helper node-rust-camelcase-name }}(inner) => inner,
@@ -33,8 +33,10 @@ impl Node {
     // new_<node> FNs
 {{ each node }}<dnl>
     /// Constructs `Node::{{ helper node-rust-camelcase-name }}` variant
-    pub(crate) fn new_{{ helper node-lower-name }}({{ each node-field }}{{ helper node-field-rust-field-name }}: {{ helper node-field-rust-field-type }}, {{ end }}) -> Self {
-        Self::{{ helper node-rust-camelcase-name }}({{ helper node-rust-camelcase-name }} { {{ each node-field }}{{ helper node-field-rust-field-name }}, {{ end }} })
+    pub(crate) fn new_{{ helper node-lower-name }}(bump: &'a bumpalo::Bump, {{ each node-field }}{{ helper node-field-rust-field-name }}: {{ helper node-field-rust-field-type }}, {{ end }}) -> &'a Self {
+        bump.alloc(
+            Self::{{ helper node-rust-camelcase-name }}({{ helper node-rust-camelcase-name }} { {{ each node-field }}{{ helper node-field-rust-field-name }}, {{ end }} })
+        )
     }
 {{ end }}<dnl>
 
@@ -49,7 +51,7 @@ impl Node {
     // as_<node> FNs
 {{ each node }}<dnl>
     /// Casts `&Node` to `Option<&nodes::{{ helper node-rust-camelcase-name }}>`
-    pub fn as_{{ helper node-lower-name }}(&self) -> Option<&{{ helper node-rust-camelcase-name }}> {
+    pub fn as_{{ helper node-lower-name }}(&'a self) -> Option<&'a {{ helper node-rust-camelcase-name }}> {
         if let Self::{{ helper node-rust-camelcase-name }}(inner) = self {
             Some(inner)
         } else {
@@ -61,7 +63,7 @@ impl Node {
     // as_<node>_mut FNs
 {{ each node }}<dnl>
     /// Casts `&Node` to `Option<&mut nodes::{{ helper node-rust-camelcase-name }}>`
-    pub fn as_{{ helper node-lower-name }}_mut(&mut self) -> Option<&mut {{ helper node-rust-camelcase-name }}> {
+    pub fn as_{{ helper node-lower-name }}_mut(&'a mut self) -> Option<&'a mut {{ helper node-rust-camelcase-name }}> {
         if let Self::{{ helper node-rust-camelcase-name }}(inner) = self {
             Some(inner)
         } else {
@@ -73,7 +75,7 @@ impl Node {
     // into_<node> FNs
 {{ each node }}<dnl>
     /// Casts `self` to `nodes::{{ helper node-rust-camelcase-name }}`, panics if variant doesn't match
-    pub fn into_{{ helper node-lower-name }}(self) -> {{ helper node-rust-camelcase-name }} {
+    pub fn into_{{ helper node-lower-name }}(self, bump: &'a bumpalo::Bump) -> {{ helper node-rust-camelcase-name }}{{ helper node-generic-lifetime }} {
         if let Self::{{ helper node-rust-camelcase-name }}(inner) = self {
             inner
         } else {

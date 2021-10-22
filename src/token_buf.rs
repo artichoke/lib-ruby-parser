@@ -1,20 +1,26 @@
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(Vec);
+use bumpalo::Bump;
+
 use crate::Bytes;
 
-#[derive(Debug, Clone, Default)]
-pub(crate) struct TokenBuf {
-    pub(crate) bytes: Bytes,
+#[derive(Debug, Clone)]
+pub(crate) struct TokenBuf<'a> {
+    bump: &'a Bump,
+    pub(crate) bytes: Bytes<'a>,
 }
 
-impl TokenBuf {
-    pub(crate) fn new(bytes: &[u8]) -> Self {
+impl<'a> TokenBuf<'a> {
+    pub(crate) fn new(bump: &'a Bump, bytes: &[u8]) -> Self {
         Self {
-            bytes: Bytes::new(List::from(bytes)),
+            bump,
+            bytes: Bytes::new(bump, Vec::from_iter_in(bytes.iter().cloned(), bump)),
         }
     }
 
     pub(crate) fn take(&mut self) -> Self {
-        std::mem::take(self)
+        let mut out = Self::new(self.bump, &[]);
+        std::mem::swap(self, &mut out);
+        out
     }
 
     pub(crate) fn push(&mut self, byte: u8) {
@@ -28,7 +34,7 @@ impl TokenBuf {
     }
 
     pub(crate) fn prepend(&mut self, part: &[u8]) {
-        let mut tmp = part.to_vec();
+        let mut tmp = Vec::from_iter_in(part.iter().cloned(), self.bump);
         tmp.extend(self.bytes.as_raw().iter());
         self.bytes.set_raw(tmp.into());
     }
@@ -49,8 +55,8 @@ impl TokenBuf {
     }
 }
 
-impl PartialEq<str> for TokenBuf {
+impl PartialEq<str> for TokenBuf<'_> {
     fn eq(&self, other: &str) -> bool {
-        self.bytes.as_raw() == other.as_bytes()
+        self.bytes.as_raw().as_slice() == other.as_bytes()
     }
 }

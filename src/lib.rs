@@ -12,6 +12,8 @@ A Ruby parser written in Rust.
 Uses bison under the hood.
 */
 
+extern crate bumpalo;
+
 mod loc;
 pub use loc::Loc;
 
@@ -19,29 +21,29 @@ pub use loc::Loc;
 /// like `Comment`, `Input`, `Decoder`
 pub mod source;
 
-#[allow(clippy::collapsible_if)]
-#[allow(clippy::collapsible_else_if)]
-mod lexer;
+// #[allow(clippy::collapsible_if)]
+// #[allow(clippy::collapsible_else_if)]
+// mod lexer;
 
-pub use lexer::Lexer;
+// pub use lexer::Lexer;
 
 mod static_environment;
 pub use static_environment::StaticEnvironment;
 
-pub(crate) mod parse_value;
+// pub(crate) mod parse_value;
 
 mod parser_options;
 pub use parser_options::ParserOptions;
 
-mod parser_result;
-pub use parser_result::ParserResult;
+// mod parser_result;
+// pub use parser_result::ParserResult;
 
-#[allow(clippy::module_inception)]
-mod parser;
-pub use parser::Parser;
+// #[allow(clippy::module_inception)]
+// mod parser;
+// pub use parser::Parser;
 
-mod builder;
-pub(crate) use builder::Builder;
+// mod builder;
+// pub(crate) use builder::Builder;
 
 mod current_arg_stack;
 pub(crate) use current_arg_stack::CurrentArgStack;
@@ -64,8 +66,8 @@ pub use lex_state::LexState;
 mod token_buf;
 pub(crate) use token_buf::TokenBuf;
 
-mod reserved_words;
-pub use reserved_words::{reserved_word, ReservedWord};
+// mod reserved_words;
+// pub use reserved_words::{reserved_word, ReservedWord};
 
 mod stack_state;
 pub(crate) use stack_state::StackState;
@@ -79,8 +81,8 @@ pub(crate) use context::{Context, ContextItem};
 pub mod nodes;
 pub use nodes::Node;
 
-/// Module to perform recursive traversing
-pub mod traverse;
+// /// Module to perform recursive traversing
+// pub mod traverse;
 
 mod token;
 pub use token::Token;
@@ -92,9 +94,9 @@ pub use bytes::Bytes;
 pub mod containers;
 pub(crate) use containers::use_native_or_external;
 
-/// Module with blobs, based on provided sizes
-#[cfg(feature = "compile-with-external-structures")]
-pub mod blobs;
+// /// Module with blobs, based on provided sizes
+// #[cfg(feature = "compile-with-external-structures")]
+// pub mod blobs;
 
-#[cfg(test)]
-pub(crate) mod test_helpers;
+// #[cfg(test)]
+// pub(crate) mod test_helpers;

@@ -26,35 +26,40 @@ macro_rules! use_native_or_external {
     };
 
     // StringPtr
-    (StringPtr) => {
-        #[cfg(feature = "compile-with-external-structures")]
-        use $crate::containers::ExternalStringPtr;
-        #[cfg(feature = "compile-with-external-structures")]
-        type StringPtr = ExternalStringPtr;
-        #[cfg(not(feature = "compile-with-external-structures"))]
-        type StringPtr = String;
+    (String) => {
+        // #[cfg(feature = "compile-with-external-structures")]
+        // use $crate::containers::ExternalStringPtr;
+        // #[cfg(feature = "compile-with-external-structures")]
+        // type StringPtr = ExternalStringPtr;
+        // #[cfg(not(feature = "compile-with-external-structures"))]
+        // type StringPtr = String;
+        use bumpalo::collections::String;
     };
 
     // List<T>
-    (List) => {
+    (Vec) => {
         // Sometimes List type is used, sometimes macro is better.
         // Because of that one of them can be unused depending on a usage pattern.
         // Thus, both are marked as "potentially unused"
-        #[cfg(feature = "compile-with-external-structures")]
-        use $crate::containers::ExternalList;
-        #[cfg(feature = "compile-with-external-structures")]
-        #[allow(dead_code)]
-        type List<T> = ExternalList<T>;
-        #[cfg(feature = "compile-with-external-structures")]
-        #[allow(unused_imports)]
-        use crate::containers::{list, list_count};
+        // #[cfg(feature = "compile-with-external-structures")]
+        // use $crate::containers::ExternalList;
+        // #[cfg(feature = "compile-with-external-structures")]
+        // #[allow(dead_code)]
+        // type List<T> = ExternalList<T>;
+        // #[cfg(feature = "compile-with-external-structures")]
+        // #[allow(unused_imports)]
+        // use crate::containers::{list, list_count};
 
-        #[cfg(not(feature = "compile-with-external-structures"))]
-        #[allow(dead_code)]
-        type List<T> = Vec<T>;
-        #[cfg(not(feature = "compile-with-external-structures"))]
+        // #[cfg(not(feature = "compile-with-external-structures"))]
+        // #[allow(dead_code)]
+        // type List<'a, T> = bumpalo::collections::Vec<'a, &'a T>;
+        // #[cfg(not(feature = "compile-with-external-structures"))]
+        // #[allow(unused_imports)]
+        // use std::vec as list;
         #[allow(unused_imports)]
-        use std::vec as list;
+        use bumpalo::collections::Vec;
+        #[allow(unused_imports)]
+        use bumpalo::vec as bump_vec;
 
         #[allow(unused_imports)]
         use crate::containers::helpers::ListAPI;

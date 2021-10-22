@@ -1,7 +1,7 @@
 use crate::Loc;
 use crate::Node;
 
-impl Node {
+impl<'a> Node<'a> {
     /// Returs a whitequark/parser -like representation of `self`.
     ///
     /// Used in tests and example scripts

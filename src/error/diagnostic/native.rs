@@ -4,18 +4,18 @@ use crate::{DiagnosticMessage, ErrorLevel};
 /// Diagnostic message that comes from the parser when there's an error or warning
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(C)]
-pub struct Diagnostic {
+pub struct Diagnostic<'a> {
     /// Level of the diagnostic (error or warnings)
     pub level: ErrorLevel,
     /// Message of the diagnostic
-    pub message: DiagnosticMessage,
+    pub message: DiagnosticMessage<'a>,
     /// Location of the diagnostic
     pub loc: Loc,
 }
 
-impl Diagnostic {
+impl<'a> Diagnostic<'a> {
     /// Construncts an instance of `Diagnostic`
-    pub fn new(level: ErrorLevel, message: DiagnosticMessage, loc: Loc) -> Self {
+    pub fn new(level: ErrorLevel, message: DiagnosticMessage<'a>, loc: Loc) -> Self {
         Self {
             level,
             message,

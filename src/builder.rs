@@ -52,19 +52,20 @@ pub(crate) enum LogicalOp {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum PKwLabel {
-    PlainLabel(Ptr<Token>),
-    QuotedLabel((Ptr<Token>, Box<List<Node>>, Ptr<Token>)),
+pub(crate) enum PKwLabel<'a> {
+    PlainLabel(&'a Token<'a>),
+    QuotedLabel((&'a Token<'a>, List<'a, &'a Node<'a>>, &'a Token<'a>)),
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum ArgsType {
-    Args(Maybe<Ptr<Node>>),
+pub(crate) enum ArgsType<'a> {
+    Args(Maybe<&'a Node<'a>>),
     Numargs(u8),
 }
 
 #[derive(Debug)]
-pub(crate) struct Builder {
+pub(crate) struct Builder<'a> {
+    bump: &'a bumpalo::Bump,
     static_env: StaticEnvironment,
     context: Context,
     current_arg_stack: CurrentArgStack,
@@ -74,8 +75,9 @@ pub(crate) struct Builder {
     diagnostics: Diagnostics,
 }
 
-impl Builder {
+impl<'a> Builder<'a> {
     pub(crate) fn new(
+        bump: &'a bumpalo::Bump,
         static_env: StaticEnvironment,
         context: Context,
         current_arg_stack: CurrentArgStack,
@@ -92,6 +94,7 @@ impl Builder {
             pattern_variables,
             pattern_hash_keys,
             diagnostics,
+            bump,
         }
     }
 
@@ -101,55 +104,49 @@ impl Builder {
 
     // Singletons
 
-    pub(crate) fn nil(&self, nil_t: Ptr<Token>) -> Ptr<Node> {
-        Ptr::new(Node::new_nil(self.loc(&nil_t)))
+    pub(crate) fn nil(&self, nil_t: &'a Token) -> &'a Node {
+        Node::new_nil(self.bump, self.loc(nil_t))
     }
 
-    pub(crate) fn true_(&self, true_t: Ptr<Token>) -> Ptr<Node> {
-        Ptr::new(Node::new_true(self.loc(&true_t)))
+    pub(crate) fn true_(&self, true_t: &'a Token) -> &'a Node {
+        Node::new_true(self.bump, self.loc(true_t))
     }
 
-    pub(crate) fn false_(&self, false_t: Ptr<Token>) -> Ptr<Node> {
-        Ptr::new(Node::new_false(self.loc(&false_t)))
+    pub(crate) fn false_(&self, false_t: &'a Token) -> &'a Node {
+        Node::new_false(self.bump, self.loc(false_t))
     }
 
     // Numerics
 
-    pub(crate) fn integer(&self, integer_t: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&integer_t);
-        Ptr::new(Node::new_int(value(integer_t), Maybe::none(), expression_l))
+    pub(crate) fn integer(&self, integer_t: &'a Token) -> &'a Node {
+        let expression_l = self.loc(integer_t);
+        Node::new_int(self.bump, value(integer_t), Maybe::none(), expression_l)
     }
 
-    pub(crate) fn float(&self, float_t: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&float_t);
-        Ptr::new(Node::new_float(value(float_t), Maybe::none(), expression_l))
+    pub(crate) fn float(&self, float_t: &'a Token) -> &'a Node {
+        let expression_l = self.loc(float_t);
+        Node::new_float(self.bump, value(float_t), Maybe::none(), expression_l)
     }
 
-    pub(crate) fn rational(&self, rational_t: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&rational_t);
-        Ptr::new(Node::new_rational(
-            value(rational_t),
-            Maybe::none(),
-            expression_l,
-        ))
+    pub(crate) fn rational(&self, rational_t: &'a Token) -> &'a Node {
+        let expression_l = self.loc(rational_t);
+        Node::new_rational(self.bump, value(rational_t), Maybe::none(), expression_l)
     }
 
-    pub(crate) fn complex(&self, complex_t: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&complex_t);
-        Ptr::new(Node::new_complex(
-            value(complex_t),
-            Maybe::none(),
-            expression_l,
-        ))
+    pub(crate) fn complex(&self, complex_t: &'a Token) -> &'a Node {
+        let expression_l = self.loc(complex_t);
+        Node::new_complex(self.bump, value(complex_t), Maybe::none(), expression_l)
     }
 
-    pub(crate) fn unary_num(&self, unary_t: Ptr<Token>, numeric: Ptr<Node>) -> Ptr<Node> {
-        let new_operator_l = self.loc(&unary_t);
+    pub(crate) fn unary_num(&self, unary_t: &'a Token, numeric: &'a Node) -> &'a Node {
+        let new_operator_l = self.loc(unary_t);
         let sign = String::from(value(unary_t));
         let mut numeric = numeric.unptr();
 
         if let Some(int) = numeric.as_int_mut() {
-            let new_value = StringPtr::from(sign + int.get_value().as_str());
+            let new_value = self
+                .bump
+                .alloc(StringPtr::from(sign + int.get_value().as_str()));
             int.set_value(new_value);
 
             let new_expression_l = new_operator_l.join(int.get_expression_l());
@@ -157,7 +154,9 @@ impl Builder {
 
             int.set_operator_l(Maybe::some(new_operator_l));
         } else if let Some(float) = numeric.as_float_mut() {
-            let new_value = StringPtr::from(sign + float.get_value().as_str());
+            let new_value = self
+                .bump
+                .alloc(StringPtr::from(sign + float.get_value().as_str()));
             float.set_value(new_value);
 
             let new_expression_l = new_operator_l.join(float.get_expression_l());
@@ -165,7 +164,9 @@ impl Builder {
 
             float.set_operator_l(Maybe::some(new_operator_l));
         } else if let Some(rational) = numeric.as_rational_mut() {
-            let new_value = StringPtr::from(sign + rational.get_value().as_str());
+            let new_value = self
+                .bump
+                .alloc(StringPtr::from(sign + rational.get_value().as_str()));
             rational.set_value(new_value);
 
             let new_expression_l = new_operator_l.join(rational.get_expression_l());
@@ -173,7 +174,9 @@ impl Builder {
 
             rational.set_operator_l(Maybe::some(new_operator_l));
         } else if let Some(complex) = numeric.as_complex_mut() {
-            let new_value = StringPtr::from(sign + complex.get_value().as_str());
+            let new_value = self
+                .bump
+                .alloc(StringPtr::from(sign + complex.get_value().as_str()));
             complex.set_value(new_value);
 
             let new_expression_l = new_operator_l.join(complex.get_expression_l());
@@ -184,22 +187,22 @@ impl Builder {
             unreachable!()
         }
 
-        Ptr::new(numeric)
+        numeric
     }
 
-    pub(crate) fn __line__(&self, line_t: Ptr<Token>) -> Ptr<Node> {
-        Ptr::new(Node::new_line(self.loc(&line_t)))
+    pub(crate) fn __line__(&self, line_t: &'a Token) -> &'a Node {
+        Ptr::new(Node::new_line(self.loc(line_t)))
     }
 
     // Strings
 
     pub(crate) fn str_node(
         &self,
-        begin_t: Maybe<Ptr<Token>>,
-        value: Bytes,
-        parts: Box<List<Node>>,
-        end_t: Maybe<Ptr<Token>>,
-    ) -> Ptr<Node> {
+        begin_t: Maybe<&'a Token>,
+        value: &'a Bytes,
+        parts: List<Node>,
+        end_t: Maybe<&'a Token>,
+    ) -> &'a Node {
         if self.is_heredoc(&begin_t) {
             let HeredocMap {
                 heredoc_body_l,
@@ -207,12 +210,13 @@ impl Builder {
                 expression_l,
             } = self.heredoc_map(&begin_t, &parts, &end_t);
 
-            Ptr::new(Node::new_heredoc(
-                *parts,
+            Node::new_heredoc(
+                self.bump,
+                parts,
                 heredoc_body_l,
                 heredoc_end_l,
                 expression_l,
-            ))
+            )
         } else {
             let CollectionMap {
                 begin_l,
@@ -220,13 +224,13 @@ impl Builder {
                 expression_l,
             } = self.collection_map(&begin_t, &parts, &end_t);
 
-            Ptr::new(Node::new_str(value, begin_l, end_l, expression_l))
+            Node::new_str(self.bump, value, begin_l, end_l, expression_l)
         }
     }
 
-    pub(crate) fn string_internal(&self, string_t: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&string_t);
-        let value = string_t.unptr().into_token_value();
+    pub(crate) fn string_internal(&self, string_t: &'a Token) -> &'a Node {
+        let expression_l = self.loc(string_t);
+        let value = string_t.token_value();
         Ptr::new(Node::new_str(
             value,
             Maybe::none(),
@@ -237,10 +241,10 @@ impl Builder {
 
     pub(crate) fn string_compose(
         &self,
-        begin_t: Maybe<Ptr<Token>>,
-        parts: Box<List<Node>>,
-        end_t: Maybe<Ptr<Token>>,
-    ) -> Ptr<Node> {
+        begin_t: Maybe<&'a Token>,
+        parts: List<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token>,
+    ) -> &'a Node {
         if parts.is_empty() {
             return self.str_node(begin_t, Bytes::empty(), parts, end_t);
         } else if parts.len() == 1 {
@@ -292,19 +296,19 @@ impl Builder {
         }
     }
 
-    pub(crate) fn character(&self, char_t: Ptr<Token>) -> Ptr<Node> {
-        let str_loc = self.loc(&char_t);
+    pub(crate) fn character(&self, char_t: &'a Token) -> &'a Node {
+        let str_loc = self.loc(char_t);
 
         let begin_l = Maybe::some(str_loc.with_end(str_loc.begin() + 1));
         let end_l = Maybe::none();
         let expression_l = str_loc;
 
-        let value = char_t.unptr().into_token_value();
+        let value = char_t.token_value();
         Ptr::new(Node::new_str(value, begin_l, end_l, expression_l))
     }
 
-    pub(crate) fn __file__(&self, file_t: Ptr<Token>) -> Ptr<Node> {
-        Ptr::new(Node::new_file(self.loc(&file_t)))
+    pub(crate) fn __file__(&self, file_t: &'a Token) -> &'a Node {
+        Ptr::new(Node::new_file(self.loc(file_t)))
     }
 
     // Symbols
@@ -318,17 +322,17 @@ impl Builder {
         }
     }
 
-    pub(crate) fn symbol(&self, start_t: Ptr<Token>, value_t: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&start_t).join(&self.loc(&value_t));
-        let begin_l = Maybe::some(self.loc(&start_t));
-        let value = value_t.unptr().into_token_value();
+    pub(crate) fn symbol(&self, start_t: &'a Token, value_t: &'a Token) -> &'a Node {
+        let expression_l = self.loc(start_t).join(&self.loc(value_t));
+        let begin_l = Maybe::some(self.loc(start_t));
+        let value = value_t.token_value();
         self.validate_sym_value(&value, &expression_l);
         Ptr::new(Node::new_sym(value, begin_l, Maybe::none(), expression_l))
     }
 
-    pub(crate) fn symbol_internal(&self, symbol_t: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&symbol_t);
-        let value = symbol_t.unptr().into_token_value();
+    pub(crate) fn symbol_internal(&self, symbol_t: &'a Token) -> &'a Node {
+        let expression_l = self.loc(symbol_t);
+        let value = symbol_t.token_value();
         self.validate_sym_value(&value, &expression_l);
         Ptr::new(Node::new_sym(
             value,
@@ -340,10 +344,10 @@ impl Builder {
 
     pub(crate) fn symbol_compose(
         &self,
-        begin_t: Ptr<Token>,
-        parts: Box<List<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
+        begin_t: &'a Token,
+        parts: List<'a, &'a Node<'a>>,
+        end_t: &'a Token,
+    ) -> &'a Node {
         if parts.len() == 1 && parts.first().unwrap().is_str() {
             let value = parts.first().unwrap().as_str().unwrap().get_value();
 
@@ -370,14 +374,14 @@ impl Builder {
 
     pub(crate) fn xstring_compose(
         &self,
-        begin_t: Ptr<Token>,
-        parts: Box<List<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let begin_l = self.loc(&begin_t);
+        begin_t: &'a Token,
+        parts: List<'a, &'a Node<'a>>,
+        end_t: &'a Token,
+    ) -> &'a Node {
+        let begin_l = self.loc(begin_t);
         if lossy_value(begin_t).as_str().starts_with("<<") {
-            let heredoc_body_l = collection_expr(&parts).unwrap_or_else(|| self.loc(&end_t));
-            let heredoc_end_l = self.loc(&end_t);
+            let heredoc_body_l = collection_expr(&parts).unwrap_or_else(|| self.loc(end_t));
+            let heredoc_end_l = self.loc(end_t);
             let expression_l = begin_l;
 
             Ptr::new(Node::new_x_heredoc(
@@ -387,7 +391,7 @@ impl Builder {
                 expression_l,
             ))
         } else {
-            let end_l = self.loc(&end_t);
+            let end_l = self.loc(end_t);
             let expression_l = begin_l.join(&end_l);
 
             Ptr::new(Node::new_xstr(*parts, begin_l, end_l, expression_l))
@@ -396,7 +400,7 @@ impl Builder {
 
     // Indented (interpolated, noninterpolated, executable) strings
 
-    pub(crate) fn heredoc_dedent(&self, node: Node, dedent_level: i32) -> Node {
+    pub(crate) fn heredoc_dedent(&self, node: &'a Node, dedent_level: i32) -> &'a Node {
         if dedent_level == 0 {
             return node;
         }
@@ -463,7 +467,7 @@ impl Builder {
 
     const TAB_WIDTH: usize = 8;
 
-    pub(crate) fn dedent_string(s: Bytes, width: usize) -> Bytes {
+    pub(crate) fn dedent_string(s: &'a Bytes, width: usize) -> &'a Bytes<'a> {
         let mut col: usize = 0;
         let mut i: usize = 0;
 
@@ -492,12 +496,12 @@ impl Builder {
 
     // Regular expressions
 
-    pub(crate) fn regexp_options(&self, regexp_end_t: Ptr<Token>) -> Maybe<Ptr<Node>> {
+    pub(crate) fn regexp_options(&self, regexp_end_t: &'a Token) -> Maybe<&'a Node> {
         if regexp_end_t.loc().end() - regexp_end_t.loc().begin() == 1 {
             // no regexp options, only trailing "/"
             return Maybe::none();
         }
-        let expression_l = self.loc(&regexp_end_t).adjust_begin(1);
+        let expression_l = self.loc(regexp_end_t).adjust_begin(1);
         let options = value(regexp_end_t);
         let mut options = options.as_str().chars().skip(1).collect::<Vec<_>>();
         options.sort_unstable();
@@ -513,15 +517,15 @@ impl Builder {
 
     pub(crate) fn regexp_compose(
         &self,
-        begin_t: Ptr<Token>,
-        parts: Box<List<Node>>,
-        end_t: Ptr<Token>,
-        options: Maybe<Ptr<Node>>,
-    ) -> Ptr<Node> {
-        let begin_l = self.loc(&begin_t);
-        let end_l = self.loc(&end_t).resize(1);
+        begin_t: &'a Token,
+        parts: List<'a, &'a Node<'a>>,
+        end_t: &'a Token,
+        options: Maybe<&'a Node>,
+    ) -> &'a Node {
+        let begin_l = self.loc(begin_t);
+        let end_l = self.loc(end_t).resize(1);
         let expression_l =
-            begin_l.join(&maybe_boxed_node_expr(&options).unwrap_or_else(|| self.loc(&end_t)));
+            begin_l.join(&maybe_boxed_node_expr(&options).unwrap_or_else(|| self.loc(end_t)));
 
         if options.is_some() && options.as_ref().unwrap().is_reg_opt() {
             let options = options
@@ -550,10 +554,10 @@ impl Builder {
 
     pub(crate) fn array(
         &self,
-        begin_t: Maybe<Ptr<Token>>,
-        elements: Box<List<Node>>,
-        end_t: Maybe<Ptr<Token>>,
-    ) -> Ptr<Node> {
+        begin_t: Maybe<&'a Token>,
+        elements: List<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token>,
+    ) -> &'a Node {
         let CollectionMap {
             begin_l,
             end_l,
@@ -563,14 +567,14 @@ impl Builder {
         Ptr::new(Node::new_array(*elements, begin_l, end_l, expression_l))
     }
 
-    pub(crate) fn splat(&self, star_t: Ptr<Token>, value: Maybe<Ptr<Node>>) -> Ptr<Node> {
-        let operator_l = self.loc(&star_t);
+    pub(crate) fn splat(&self, star_t: &'a Token, value: Maybe<&'a Node>) -> &'a Node {
+        let operator_l = self.loc(star_t);
         let expression_l = operator_l.maybe_join(&maybe_boxed_node_expr(&value));
 
         Ptr::new(Node::new_splat(value, operator_l, expression_l))
     }
 
-    pub(crate) fn word(&self, parts: Box<List<Node>>) -> Ptr<Node> {
+    pub(crate) fn word(&self, parts: List<'a, &'a Node<'a>>) -> &'a Node {
         if parts.len() == 1 && (parts[0].is_str() || parts[0].is_dstr()) {
             let part = parts
                 .into_iter()
@@ -590,12 +594,12 @@ impl Builder {
 
     pub(crate) fn words_compose(
         &self,
-        begin_t: Ptr<Token>,
-        elements: Box<List<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let begin_l = self.loc(&begin_t);
-        let end_l = self.loc(&end_t);
+        begin_t: &'a Token,
+        elements: List<'a, &'a Node<'a>>,
+        end_t: &'a Token,
+    ) -> &'a Node {
+        let begin_l = self.loc(begin_t);
+        let end_l = self.loc(end_t);
         let expression_l = begin_l.join(&end_l);
         Ptr::new(Node::new_array(
             *elements,
@@ -607,10 +611,10 @@ impl Builder {
 
     pub(crate) fn symbols_compose(
         &self,
-        begin_t: Ptr<Token>,
-        parts: Box<List<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
+        begin_t: &'a Token,
+        parts: List<'a, &'a Node<'a>>,
+        end_t: &'a Token,
+    ) -> &'a Node {
         let parts = parts
             .into_iter()
             .map(|part| {
@@ -637,8 +641,8 @@ impl Builder {
             })
             .collect::<Vec<_>>();
 
-        let begin_l = self.loc(&begin_t);
-        let end_l = self.loc(&end_t);
+        let begin_l = self.loc(begin_t);
+        let end_l = self.loc(end_t);
         let expression_l = begin_l.join(&end_l);
         Ptr::new(Node::new_array(
             List::from(parts),
@@ -650,20 +654,20 @@ impl Builder {
 
     // Hashes
 
-    pub(crate) fn pair(&self, key: Ptr<Node>, assoc_t: Ptr<Token>, value: Ptr<Node>) -> Ptr<Node> {
-        let operator_l = self.loc(&assoc_t);
+    pub(crate) fn pair(&self, key: &'a Node, assoc_t: &'a Token, value: &'a Node) -> &'a Node {
+        let operator_l = self.loc(assoc_t);
         let expression_l = join_exprs(&key, &value);
 
         Ptr::new(Node::new_pair(key, value, operator_l, expression_l))
     }
 
-    pub(crate) fn pair_keyword(&self, key_t: Ptr<Token>, value: Ptr<Node>) -> Ptr<Node> {
-        let key_loc = self.loc(&key_t);
+    pub(crate) fn pair_keyword(&self, key_t: &'a Token, value: &'a Node) -> &'a Node {
+        let key_loc = self.loc(key_t);
         let key_l = key_loc.adjust_end(-1);
         let colon_l = key_loc.with_begin(key_loc.end() - 1);
         let expression_l = key_loc.join(value.expression());
 
-        let key = key_t.unptr().into_token_value();
+        let key = key_t.token_value();
         self.validate_sym_value(&key, &key_l);
 
         Ptr::new(Node::new_pair(
@@ -676,26 +680,26 @@ impl Builder {
 
     pub(crate) fn pair_quoted(
         &self,
-        begin_t: Ptr<Token>,
-        parts: Box<List<Node>>,
-        end_t: Ptr<Token>,
-        value: Ptr<Node>,
-    ) -> Ptr<Node> {
-        let end_l = self.loc(&end_t);
+        begin_t: &'a Token,
+        parts: List<'a, &'a Node<'a>>,
+        end_t: &'a Token,
+        value: &'a Node,
+    ) -> &'a Node {
+        let end_l = self.loc(end_t);
 
         let quote_loc = Loc::new(end_l.end() - 2, end_l.end() - 1);
 
         let colon_l = end_l.with_begin(end_l.end() - 1);
 
         let end_t = end_t.unptr();
-        let end_t: Ptr<Token> = Ptr::new(Token::new(
+        let end_t: &'a Token = Ptr::new(Token::new(
             end_t.token_type(),
             end_t.into_token_value(),
             quote_loc,
             LexState::default(),
             LexState::default(),
         ));
-        let expression_l = self.loc(&begin_t).join(value.expression());
+        let expression_l = self.loc(begin_t).join(value.expression());
 
         Ptr::new(Node::new_pair(
             self.symbol_compose(begin_t, parts, end_t),
@@ -705,8 +709,8 @@ impl Builder {
         ))
     }
 
-    pub(crate) fn kwsplat(&self, dstar_t: Ptr<Token>, value: Ptr<Node>) -> Ptr<Node> {
-        let operator_l = self.loc(&dstar_t);
+    pub(crate) fn kwsplat(&self, dstar_t: &'a Token, value: &'a Node) -> &'a Node {
+        let operator_l = self.loc(dstar_t);
         let expression_l = value.expression().join(&operator_l);
 
         Ptr::new(Node::new_kwsplat(value, operator_l, expression_l))
@@ -714,10 +718,10 @@ impl Builder {
 
     pub(crate) fn associate(
         &self,
-        begin_t: Maybe<Ptr<Token>>,
-        pairs: Box<List<Node>>,
-        end_t: Maybe<Ptr<Token>>,
-    ) -> Ptr<Node> {
+        begin_t: Maybe<&'a Token>,
+        pairs: List<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token>,
+    ) -> &'a Node {
         let CollectionMap {
             begin_l,
             end_l,
@@ -731,11 +735,11 @@ impl Builder {
 
     pub(crate) fn range_inclusive(
         &self,
-        left: Maybe<Ptr<Node>>,
-        dot2_t: Ptr<Token>,
-        right: Maybe<Ptr<Node>>,
-    ) -> Ptr<Node> {
-        let operator_l = self.loc(&dot2_t);
+        left: Maybe<&'a Node>,
+        dot2_t: &'a Token,
+        right: Maybe<&'a Node>,
+    ) -> &'a Node {
+        let operator_l = self.loc(dot2_t);
         let expression_l = operator_l
             .maybe_join(&maybe_boxed_node_expr(&left))
             .maybe_join(&maybe_boxed_node_expr(&right));
@@ -745,11 +749,11 @@ impl Builder {
 
     pub(crate) fn range_exclusive(
         &self,
-        left: Maybe<Ptr<Node>>,
-        dot3_t: Ptr<Token>,
-        right: Maybe<Ptr<Node>>,
-    ) -> Ptr<Node> {
-        let operator_l = self.loc(&dot3_t);
+        left: Maybe<&'a Node>,
+        dot3_t: &'a Token,
+        right: Maybe<&'a Node>,
+    ) -> &'a Node {
+        let operator_l = self.loc(dot3_t);
         let expression_l = operator_l
             .maybe_join(&maybe_boxed_node_expr(&left))
             .maybe_join(&maybe_boxed_node_expr(&right));
@@ -761,43 +765,43 @@ impl Builder {
     // Access
     //
 
-    pub(crate) fn self_(&self, token: Ptr<Token>) -> Ptr<Node> {
-        Ptr::new(Node::new_self(self.loc(&token)))
+    pub(crate) fn self_(&self, token: &'a Token) -> &'a Node {
+        Ptr::new(Node::new_self(self.loc(token)))
     }
 
-    pub(crate) fn lvar(&self, token: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&token);
+    pub(crate) fn lvar(&self, token: &'a Token) -> &'a Node {
+        let expression_l = self.loc(token);
         Ptr::new(Node::new_lvar(value(token), expression_l))
     }
 
-    pub(crate) fn ivar(&self, token: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&token);
+    pub(crate) fn ivar(&self, token: &'a Token) -> &'a Node {
+        let expression_l = self.loc(token);
         Ptr::new(Node::new_ivar(value(token), expression_l))
     }
 
-    pub(crate) fn gvar(&self, token: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&token);
+    pub(crate) fn gvar(&self, token: &'a Token) -> &'a Node {
+        let expression_l = self.loc(token);
         Ptr::new(Node::new_gvar(value(token), expression_l))
     }
 
-    pub(crate) fn cvar(&self, token: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&token);
+    pub(crate) fn cvar(&self, token: &'a Token) -> &'a Node {
+        let expression_l = self.loc(token);
         Ptr::new(Node::new_cvar(value(token), expression_l))
     }
 
-    pub(crate) fn back_ref(&self, token: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&token);
+    pub(crate) fn back_ref(&self, token: &'a Token) -> &'a Node {
+        let expression_l = self.loc(token);
         Ptr::new(Node::new_back_ref(value(token), expression_l))
     }
 
     const MAX_NTH_REF: usize = 0b111111111111111111111111111111;
 
-    pub(crate) fn nth_ref(&self, token: Ptr<Token>) -> Ptr<Node> {
-        let expression_l = self.loc(&token);
+    pub(crate) fn nth_ref(&self, token: &'a Token) -> &'a Node {
+        let expression_l = self.loc(token);
         let name = value(token);
         let name = &name.as_str()[1..];
         let parsed = name.parse::<usize>();
-        let name = StringPtr::from(name);
+        let name = self.bump.alloc(StringPtr::from(name));
 
         if parsed.is_err() || parsed.map(|n| n > Self::MAX_NTH_REF) == Ok(true) {
             self.warn(
@@ -808,7 +812,7 @@ impl Builder {
 
         Ptr::new(Node::new_nth_ref(name, expression_l))
     }
-    pub(crate) fn accessible(&self, node: Ptr<Node>) -> Ptr<Node> {
+    pub(crate) fn accessible(&self, node: &'a Node) -> &'a Node {
         if node.is_lvar() {
             let internal::Lvar { name, expression_l } = node.unptr().into_lvar().into_internal();
             let name_s = name.as_str();
@@ -829,7 +833,7 @@ impl Builder {
                     name,
                     list![],
                     Maybe::none(),
-                    Maybe::some(expression_l.clone()),
+                    Maybe::some(expression_l),
                     Maybe::none(),
                     Maybe::none(),
                     Maybe::none(),
@@ -841,9 +845,9 @@ impl Builder {
         }
     }
 
-    pub(crate) fn const_(&self, name_t: Ptr<Token>) -> Ptr<Node> {
-        let name_l = self.loc(&name_t);
-        let expression_l = name_l.clone();
+    pub(crate) fn const_(&self, name_t: &'a Token) -> &'a Node {
+        let name_l = self.loc(name_t);
+        let expression_l = name_l;
 
         Ptr::new(Node::new_const(
             Maybe::none(),
@@ -854,12 +858,12 @@ impl Builder {
         ))
     }
 
-    pub(crate) fn const_global(&self, t_colon3: Ptr<Token>, name_t: Ptr<Token>) -> Ptr<Node> {
-        let scope = Ptr::new(Node::new_cbase(self.loc(&t_colon3)));
+    pub(crate) fn const_global(&self, t_colon3: &'a Token, name_t: &'a Token) -> &'a Node {
+        let scope = Ptr::new(Node::new_cbase(self.loc(t_colon3)));
 
-        let name_l = self.loc(&name_t);
+        let name_l = self.loc(name_t);
         let expression_l = scope.expression().join(&name_l);
-        let double_colon_l = self.loc(&t_colon3);
+        let double_colon_l = self.loc(t_colon3);
 
         Ptr::new(Node::new_const(
             Maybe::some(scope),
@@ -872,14 +876,14 @@ impl Builder {
 
     pub(crate) fn const_fetch(
         &self,
-        scope: Ptr<Node>,
-        t_colon2: Ptr<Token>,
-        name_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let scope: Ptr<Node> = scope;
-        let name_l = self.loc(&name_t);
+        scope: &'a Node,
+        t_colon2: &'a Token,
+        name_t: &'a Token,
+    ) -> &'a Node {
+        let scope: &'a Node = scope;
+        let name_l = self.loc(name_t);
         let expression_l = scope.expression().join(&name_l);
-        let double_colon_l = self.loc(&t_colon2);
+        let double_colon_l = self.loc(t_colon2);
 
         Ptr::new(Node::new_const(
             Maybe::some(scope),
@@ -890,21 +894,21 @@ impl Builder {
         ))
     }
 
-    pub(crate) fn __encoding__(&self, encoding_t: Ptr<Token>) -> Ptr<Node> {
-        Ptr::new(Node::new_encoding(self.loc(&encoding_t)))
+    pub(crate) fn __encoding__(&self, encoding_t: &'a Token) -> &'a Node {
+        Ptr::new(Node::new_encoding(self.loc(encoding_t)))
     }
 
     //
     // Assignments
     //
 
-    pub(crate) fn assignable(&self, node: Ptr<Node>) -> Result<Ptr<Node>, ()> {
+    pub(crate) fn assignable(&self, node: &'a Node) -> Result<&'a Node, ()> {
         let node = if node.is_cvar() {
             let internal::Cvar { name, expression_l } = node.unptr().into_cvar().into_internal();
             Node::new_cvasgn(
                 name,
                 Maybe::none(),
-                expression_l.clone(),
+                expression_l,
                 Maybe::none(),
                 expression_l,
             )
@@ -913,7 +917,7 @@ impl Builder {
             Node::new_ivasgn(
                 name,
                 Maybe::none(),
-                expression_l.clone(),
+                expression_l,
                 Maybe::none(),
                 expression_l,
             )
@@ -922,7 +926,7 @@ impl Builder {
             Node::new_gvasgn(
                 name,
                 Maybe::none(),
-                expression_l.clone(),
+                expression_l,
                 Maybe::none(),
                 expression_l,
             )
@@ -961,7 +965,7 @@ impl Builder {
             Node::new_lvasgn(
                 name,
                 Maybe::none(),
-                expression_l.clone(),
+                expression_l,
                 Maybe::none(),
                 expression_l,
             )
@@ -1016,7 +1020,7 @@ impl Builder {
         Ok(Ptr::new(node))
     }
 
-    pub(crate) fn const_op_assignable(&self, node: Ptr<Node>) -> Ptr<Node> {
+    pub(crate) fn const_op_assignable(&self, node: &'a Node) -> &'a Node {
         if node.is_const() {
             let internal::Const {
                 scope,
@@ -1039,13 +1043,8 @@ impl Builder {
         }
     }
 
-    pub(crate) fn assign(
-        &self,
-        lhs: Ptr<Node>,
-        eql_t: Ptr<Token>,
-        new_rhs: Ptr<Node>,
-    ) -> Ptr<Node> {
-        let op_l = Maybe::some(self.loc(&eql_t));
+    pub(crate) fn assign(&self, lhs: &'a Node, eql_t: &'a Token, new_rhs: &'a Node) -> &'a Node {
+        let op_l = Maybe::some(self.loc(eql_t));
         let expr_l = join_exprs(&lhs, &new_rhs);
         let mut lhs = lhs.unptr();
 
@@ -1098,11 +1097,11 @@ impl Builder {
 
     pub(crate) fn op_assign(
         &self,
-        mut lhs: Ptr<Node>,
-        op_t: Ptr<Token>,
-        rhs: Ptr<Node>,
-    ) -> Result<Ptr<Node>, ()> {
-        let operator_l = self.loc(&op_t);
+        mut lhs: &'a Node,
+        op_t: &'a Token,
+        rhs: &'a Node,
+    ) -> Result<&'a Node, ()> {
+        let operator_l = self.loc(op_t);
         let mut operator = String::from(value(op_t));
         operator.pop();
         let expression_l = join_exprs(&lhs, &rhs);
@@ -1154,15 +1153,15 @@ impl Builder {
             unreachable!("unsupported op_assign lhs {:?}", lhs)
         }
 
-        let recv: Ptr<Node> = lhs;
-        let value: Ptr<Node> = rhs;
+        let recv: &'a Node = lhs;
+        let value: &'a Node = rhs;
 
         let result = match &operator[..] {
             "&&" => Node::new_and_asgn(recv, value, operator_l, expression_l),
             "||" => Node::new_or_asgn(recv, value, operator_l, expression_l),
             _ => Node::new_op_asgn(
                 recv,
-                StringPtr::from(operator),
+                self.bump.alloc(StringPtr::from(operator)),
                 value,
                 operator_l,
                 expression_l,
@@ -1174,29 +1173,24 @@ impl Builder {
 
     pub(crate) fn multi_lhs(
         &self,
-        begin_t: Maybe<Ptr<Token>>,
-        items: Box<List<Node>>,
-        end_t: Maybe<Ptr<Token>>,
-    ) -> Ptr<Node> {
+        begin_t: Maybe<&'a Token>,
+        items: List<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token>,
+    ) -> &'a Node {
         let CollectionMap {
             begin_l,
             end_l,
             expression_l,
         } = self.collection_map(&begin_t, &items, &end_t);
 
-        Ptr::new(Node::new_mlhs(*items, begin_l, end_l, expression_l))
+        Node::new_mlhs(*items, begin_l, end_l, expression_l)
     }
 
-    pub(crate) fn multi_assign(
-        &self,
-        lhs: Ptr<Node>,
-        eql_t: Ptr<Token>,
-        rhs: Ptr<Node>,
-    ) -> Ptr<Node> {
-        let operator_l = self.loc(&eql_t);
+    pub(crate) fn multi_assign(&self, lhs: &'a Node, eql_t: &'a Token, rhs: &'a Node) -> &'a Node {
+        let operator_l = self.loc(eql_t);
         let expression_l = join_exprs(&lhs, &rhs);
 
-        Ptr::new(Node::new_masgn(lhs, rhs, operator_l, expression_l))
+        Node::new_masgn(lhs, rhs, operator_l, expression_l)
     }
 
     //
@@ -1205,19 +1199,19 @@ impl Builder {
 
     pub(crate) fn def_class(
         &self,
-        class_t: Ptr<Token>,
-        name: Ptr<Node>,
-        lt_t: Maybe<Ptr<Token>>,
-        superclass: Maybe<Ptr<Node>>,
-        body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let keyword_l = self.loc(&class_t);
-        let end_l = self.loc(&end_t);
+        class_t: &'a Token,
+        name: &'a Node,
+        lt_t: Maybe<&'a Token>,
+        superclass: Maybe<&'a Node>,
+        body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> &'a Node {
+        let keyword_l = self.loc(class_t);
+        let end_l = self.loc(end_t);
         let operator_l = self.maybe_loc(&lt_t);
         let expression_l = keyword_l.join(&end_l);
 
-        Ptr::new(Node::new_class(
+        Node::new_class(
             name,
             superclass,
             body,
@@ -1225,41 +1219,34 @@ impl Builder {
             operator_l,
             end_l,
             expression_l,
-        ))
+        )
     }
 
     pub(crate) fn def_sclass(
         &self,
-        class_t: Ptr<Token>,
-        lshift_t: Ptr<Token>,
-        expr: Ptr<Node>,
-        body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let keyword_l = self.loc(&class_t);
-        let end_l = self.loc(&end_t);
-        let operator_l = self.loc(&lshift_t);
+        class_t: &'a Token,
+        lshift_t: &'a Token,
+        expr: &'a Node,
+        body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> &'a Node {
+        let keyword_l = self.loc(class_t);
+        let end_l = self.loc(end_t);
+        let operator_l = self.loc(lshift_t);
         let expression_l = keyword_l.join(&end_l);
 
-        Ptr::new(Node::new_s_class(
-            expr,
-            body,
-            keyword_l,
-            operator_l,
-            end_l,
-            expression_l,
-        ))
+        Node::new_s_class(expr, body, keyword_l, operator_l, end_l, expression_l)
     }
 
     pub(crate) fn def_module(
         &self,
-        module_t: Ptr<Token>,
-        name: Ptr<Node>,
-        body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let keyword_l = self.loc(&module_t);
-        let end_l = self.loc(&end_t);
+        module_t: &'a Token,
+        name: &'a Node,
+        body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> &'a Node {
+        let keyword_l = self.loc(module_t);
+        let end_l = self.loc(end_t);
         let expression_l = keyword_l.join(&end_l);
 
         Ptr::new(Node::new_module(name, body, keyword_l, end_l, expression_l))
@@ -1271,15 +1258,15 @@ impl Builder {
 
     pub(crate) fn def_method(
         &self,
-        def_t: Ptr<Token>,
-        name_t: Ptr<Token>,
-        args: Maybe<Ptr<Node>>,
-        body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Result<Ptr<Node>, ()> {
-        let name_l = self.loc(&name_t);
-        let keyword_l = self.loc(&def_t);
-        let end_l = self.loc(&end_t);
+        def_t: &'a Token,
+        name_t: &'a Token,
+        args: Maybe<&'a Node>,
+        body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> Result<&'a Node, ()> {
+        let name_l = self.loc(name_t);
+        let keyword_l = self.loc(def_t);
+        let end_l = self.loc(end_t);
         let expression_l = keyword_l.join(&end_l);
 
         let name = value(name_t);
@@ -1299,19 +1286,19 @@ impl Builder {
 
     pub(crate) fn def_endless_method(
         &self,
-        def_t: Ptr<Token>,
-        name_t: Ptr<Token>,
-        args: Maybe<Ptr<Node>>,
-        assignment_t: Ptr<Token>,
-        body: Maybe<Ptr<Node>>,
-    ) -> Result<Ptr<Node>, ()> {
+        def_t: &'a Token,
+        name_t: &'a Token,
+        args: Maybe<&'a Node>,
+        assignment_t: &'a Token,
+        body: Maybe<&'a Node>,
+    ) -> Result<&'a Node, ()> {
         let body_l = maybe_boxed_node_expr(&body)
             .unwrap_or_else(|| unreachable!("endless method always has a body"));
 
-        let keyword_l = self.loc(&def_t);
+        let keyword_l = self.loc(def_t);
         let expression_l = keyword_l.join(&body_l);
-        let name_l = self.loc(&name_t);
-        let assignment_l = self.loc(&assignment_t);
+        let name_l = self.loc(name_t);
+        let assignment_l = self.loc(assignment_t);
 
         let name = value(name_t);
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
@@ -1330,18 +1317,18 @@ impl Builder {
 
     pub(crate) fn def_singleton(
         &self,
-        def_t: Ptr<Token>,
-        definee: Ptr<Node>,
-        dot_t: Ptr<Token>,
-        name_t: Ptr<Token>,
-        args: Maybe<Ptr<Node>>,
-        body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Result<Ptr<Node>, ()> {
-        let keyword_l = self.loc(&def_t);
-        let operator_l = self.loc(&dot_t);
-        let name_l = self.loc(&name_t);
-        let end_l = self.loc(&end_t);
+        def_t: &'a Token,
+        definee: &'a Node,
+        dot_t: &'a Token,
+        name_t: &'a Token,
+        args: Maybe<&'a Node>,
+        body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> Result<&'a Node, ()> {
+        let keyword_l = self.loc(def_t);
+        let operator_l = self.loc(dot_t);
+        let name_l = self.loc(name_t);
+        let end_l = self.loc(end_t);
         let expression_l = keyword_l.join(&end_l);
 
         let name = value(name_t);
@@ -1363,21 +1350,21 @@ impl Builder {
 
     pub(crate) fn def_endless_singleton(
         &self,
-        def_t: Ptr<Token>,
-        definee: Ptr<Node>,
-        dot_t: Ptr<Token>,
-        name_t: Ptr<Token>,
-        args: Maybe<Ptr<Node>>,
-        assignment_t: Ptr<Token>,
-        body: Maybe<Ptr<Node>>,
-    ) -> Result<Ptr<Node>, ()> {
+        def_t: &'a Token,
+        definee: &'a Node,
+        dot_t: &'a Token,
+        name_t: &'a Token,
+        args: Maybe<&'a Node>,
+        assignment_t: &'a Token,
+        body: Maybe<&'a Node>,
+    ) -> Result<&'a Node, ()> {
         let body_l = maybe_boxed_node_expr(&body)
             .unwrap_or_else(|| unreachable!("endless method always has body"));
 
-        let keyword_l = self.loc(&def_t);
-        let operator_l = self.loc(&dot_t);
-        let name_l = self.loc(&name_t);
-        let assignment_l = self.loc(&assignment_t);
+        let keyword_l = self.loc(def_t);
+        let operator_l = self.loc(dot_t);
+        let name_l = self.loc(name_t);
+        let assignment_l = self.loc(assignment_t);
         let expression_l = keyword_l.join(&body_l);
 
         let name = value(name_t);
@@ -1397,14 +1384,18 @@ impl Builder {
         )))
     }
 
-    pub(crate) fn undef_method(&self, undef_t: Ptr<Token>, names: Box<List<Node>>) -> Ptr<Node> {
-        let keyword_l = self.loc(&undef_t);
+    pub(crate) fn undef_method(
+        &self,
+        undef_t: &'a Token,
+        names: List<'a, &'a Node<'a>>,
+    ) -> &'a Node {
+        let keyword_l = self.loc(undef_t);
         let expression_l = keyword_l.maybe_join(&collection_expr(&names));
         Ptr::new(Node::new_undef(*names, keyword_l, expression_l))
     }
 
-    pub(crate) fn alias(&self, alias_t: Ptr<Token>, to: Ptr<Node>, from: Ptr<Node>) -> Ptr<Node> {
-        let keyword_l = self.loc(&alias_t);
+    pub(crate) fn alias(&self, alias_t: &'a Token, to: &'a Node, from: &'a Node) -> &'a Node {
+        let keyword_l = self.loc(alias_t);
         let expression_l = keyword_l.join(from.expression());
         Ptr::new(Node::new_alias(to, from, keyword_l, expression_l))
     }
@@ -1415,10 +1406,10 @@ impl Builder {
 
     pub(crate) fn args(
         &self,
-        begin_t: Maybe<Ptr<Token>>,
-        args: Box<List<Node>>,
-        end_t: Maybe<Ptr<Token>>,
-    ) -> Maybe<Ptr<Node>> {
+        begin_t: Maybe<&'a Token>,
+        args: List<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token>,
+    ) -> Maybe<&'a Node> {
         self.check_duplicate_args(&args, &mut HashMap::new());
 
         if begin_t.is_none() && args.is_empty() && end_t.is_none() {
@@ -1441,13 +1432,13 @@ impl Builder {
 
     pub(crate) fn forward_only_args(
         &self,
-        begin_t: Ptr<Token>,
-        dots_t: Ptr<Token>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
+        begin_t: &'a Token,
+        dots_t: &'a Token,
+        end_t: &'a Token,
+    ) -> &'a Node {
         let args = list![self.forward_arg(dots_t).unptr()];
-        let begin_l = self.loc(&begin_t);
-        let end_l = self.loc(&end_t);
+        let begin_l = self.loc(begin_t);
+        let end_l = self.loc(end_t);
         let expression_l = begin_l.join(&end_l);
         Ptr::new(Node::new_args(
             args,
@@ -1457,12 +1448,12 @@ impl Builder {
         ))
     }
 
-    pub(crate) fn forward_arg(&self, dots_t: Ptr<Token>) -> Ptr<Node> {
-        Ptr::new(Node::new_forward_arg(self.loc(&dots_t)))
+    pub(crate) fn forward_arg(&self, dots_t: &'a Token) -> &'a Node {
+        Ptr::new(Node::new_forward_arg(self.loc(dots_t)))
     }
 
-    pub(crate) fn arg(&self, name_t: Ptr<Token>) -> Result<Ptr<Node>, ()> {
-        let name_l = self.loc(&name_t);
+    pub(crate) fn arg(&self, name_t: &'a Token) -> Result<&'a Node, ()> {
+        let name_l = self.loc(name_t);
         let name = value(name_t);
 
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
@@ -1472,13 +1463,13 @@ impl Builder {
 
     pub(crate) fn optarg(
         &self,
-        name_t: Ptr<Token>,
-        eql_t: Ptr<Token>,
-        default: Ptr<Node>,
-    ) -> Result<Ptr<Node>, ()> {
-        let operator_l = self.loc(&eql_t);
-        let name_l = self.loc(&name_t);
-        let expression_l = self.loc(&name_t).join(default.expression());
+        name_t: &'a Token,
+        eql_t: &'a Token,
+        default: &'a Node,
+    ) -> Result<&'a Node, ()> {
+        let operator_l = self.loc(eql_t);
+        let name_l = self.loc(name_t);
+        let expression_l = self.loc(name_t).join(default.expression());
 
         let name = value(name_t);
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
@@ -1494,12 +1485,12 @@ impl Builder {
 
     pub(crate) fn restarg(
         &self,
-        star_t: Ptr<Token>,
-        name_t: Maybe<Ptr<Token>>,
-    ) -> Result<Ptr<Node>, ()> {
+        star_t: &'a Token,
+        name_t: Maybe<&'a Token>,
+    ) -> Result<&'a Node, ()> {
         let (name, name_l) = if name_t.is_some() {
             let name_t = name_t.unwrap();
-            let name_l = self.loc(&name_t);
+            let name_l = self.loc(name_t);
             let name = value(name_t);
             self.check_reserved_for_numparam(name.as_str(), &name_l)?;
             (Maybe::some(name), Maybe::some(name_l))
@@ -1507,7 +1498,7 @@ impl Builder {
             (Maybe::none(), Maybe::none())
         };
 
-        let operator_l = self.loc(&star_t);
+        let operator_l = self.loc(star_t);
         let expression_l = operator_l.maybe_join(&name_l);
 
         Ok(Ptr::new(Node::new_restarg(
@@ -1518,8 +1509,8 @@ impl Builder {
         )))
     }
 
-    pub(crate) fn kwarg(&self, name_t: Ptr<Token>) -> Result<Ptr<Node>, ()> {
-        let name_l = self.loc(&name_t);
+    pub(crate) fn kwarg(&self, name_t: &'a Token) -> Result<&'a Node, ()> {
+        let name_l = self.loc(name_t);
         let name = value(name_t);
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
 
@@ -1529,8 +1520,8 @@ impl Builder {
         Ok(Ptr::new(Node::new_kwarg(name, name_l, expression_l)))
     }
 
-    pub(crate) fn kwoptarg(&self, name_t: Ptr<Token>, default: Ptr<Node>) -> Result<Ptr<Node>, ()> {
-        let name_l = self.loc(&name_t);
+    pub(crate) fn kwoptarg(&self, name_t: &'a Token, default: &'a Node) -> Result<&'a Node, ()> {
+        let name_l = self.loc(name_t);
         let name = value(name_t);
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
 
@@ -1548,12 +1539,12 @@ impl Builder {
 
     pub(crate) fn kwrestarg(
         &self,
-        dstar_t: Ptr<Token>,
-        name_t: Maybe<Ptr<Token>>,
-    ) -> Result<Ptr<Node>, ()> {
+        dstar_t: &'a Token,
+        name_t: Maybe<&'a Token>,
+    ) -> Result<&'a Node, ()> {
         let (name, name_l) = if name_t.is_some() {
             let name_t = name_t.unwrap();
-            let name_l = self.loc(&name_t);
+            let name_l = self.loc(name_t);
             let name = value(name_t);
             self.check_reserved_for_numparam(name.as_str(), &name_l)?;
             (Maybe::some(name), Maybe::some(name_l))
@@ -1561,7 +1552,7 @@ impl Builder {
             (Maybe::none(), Maybe::none())
         };
 
-        let operator_l = self.loc(&dstar_t);
+        let operator_l = self.loc(dstar_t);
         let expression_l = operator_l.maybe_join(&name_l);
 
         Ok(Ptr::new(Node::new_kwrestarg(
@@ -1572,31 +1563,27 @@ impl Builder {
         )))
     }
 
-    pub(crate) fn kwnilarg(&self, dstar_t: Ptr<Token>, nil_t: Ptr<Token>) -> Ptr<Node> {
-        let dstar_l = self.loc(&dstar_t);
-        let nil_l = self.loc(&nil_t);
+    pub(crate) fn kwnilarg(&self, dstar_t: &'a Token, nil_t: &'a Token) -> &'a Node {
+        let dstar_l = self.loc(dstar_t);
+        let nil_l = self.loc(nil_t);
         let expression_l = dstar_l.join(&nil_l);
         Ptr::new(Node::new_kwnilarg(nil_l, expression_l))
     }
 
-    pub(crate) fn shadowarg(&self, name_t: Ptr<Token>) -> Result<Ptr<Node>, ()> {
-        let name_l = self.loc(&name_t);
+    pub(crate) fn shadowarg(&self, name_t: &'a Token) -> Result<&'a Node, ()> {
+        let name_l = self.loc(name_t);
         let name = value(name_t);
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
 
         Ok(Ptr::new(Node::new_shadowarg(name, name_l)))
     }
 
-    pub(crate) fn blockarg(
-        &self,
-        amper_t: Ptr<Token>,
-        name_t: Ptr<Token>,
-    ) -> Result<Ptr<Node>, ()> {
-        let name_l = self.loc(&name_t);
+    pub(crate) fn blockarg(&self, amper_t: &'a Token, name_t: &'a Token) -> Result<&'a Node, ()> {
+        let name_l = self.loc(name_t);
         let name = value(name_t);
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
 
-        let operator_l = self.loc(&amper_t);
+        let operator_l = self.loc(amper_t);
         let expression_l = operator_l.join(&name_l);
 
         Ok(Ptr::new(Node::new_blockarg(
@@ -1607,7 +1594,7 @@ impl Builder {
         )))
     }
 
-    pub(crate) fn procarg0(&self, arg: Ptr<Node>) -> Ptr<Node> {
+    pub(crate) fn procarg0(&self, arg: &'a Node) -> &'a Node {
         if arg.is_mlhs() {
             let internal::Mlhs {
                 items,
@@ -1617,7 +1604,7 @@ impl Builder {
             } = arg.unptr().into_mlhs().into_internal();
             Ptr::new(Node::new_procarg0(items, begin_l, end_l, expression_l))
         } else if arg.is_arg() {
-            let expression_l = arg.expression().clone();
+            let expression_l = arg.expression();
             Ptr::new(Node::new_procarg0(
                 list![arg.unptr()],
                 Maybe::none(),
@@ -1633,26 +1620,26 @@ impl Builder {
     // Method calls
     //
 
-    fn call_type_for_dot(&self, dot_t: &Maybe<Ptr<Token>>) -> MethodCallType {
+    fn call_type_for_dot(&self, dot_t: &Maybe<&'a Token>) -> MethodCallType {
         match dot_t.as_ref() {
             Some(token) if token.token_type() == Lexer::tANDDOT => MethodCallType::CSend,
             _ => MethodCallType::Send,
         }
     }
 
-    pub(crate) fn forwarded_args(&self, dots_t: Ptr<Token>) -> Ptr<Node> {
-        Ptr::new(Node::new_forwarded_args(self.loc(&dots_t)))
+    pub(crate) fn forwarded_args(&self, dots_t: &'a Token) -> &'a Node {
+        Ptr::new(Node::new_forwarded_args(self.loc(dots_t)))
     }
 
     pub(crate) fn call_method(
         &self,
-        receiver: Maybe<Ptr<Node>>,
-        dot_t: Maybe<Ptr<Token>>,
-        selector_t: Maybe<Ptr<Token>>,
-        lparen_t: Maybe<Ptr<Token>>,
-        mut args: Box<List<Node>>,
-        rparen_t: Maybe<Ptr<Token>>,
-    ) -> Ptr<Node> {
+        receiver: Maybe<&'a Node>,
+        dot_t: Maybe<&'a Token>,
+        selector_t: Maybe<&'a Token>,
+        lparen_t: Maybe<&'a Token>,
+        mut args: List<'a, &'a Node<'a>>,
+        rparen_t: Maybe<&'a Token>,
+    ) -> &'a Node {
         let begin_l = maybe_boxed_node_expr(&receiver)
             .or_else(|| self.maybe_loc(&selector_t))
             .unwrap_or_else(|| unreachable!("can't compute begin_l"));
@@ -1673,7 +1660,7 @@ impl Builder {
         let method_name = if method_name.is_some() {
             method_name.unwrap()
         } else {
-            StringPtr::from("call")
+            self.bump.alloc(StringPtr::from("call"))
         };
 
         self.rewrite_hash_args_to_kwargs(&mut args);
@@ -1705,18 +1692,18 @@ impl Builder {
         }
     }
 
-    pub(crate) fn call_lambda(&self, lambda_t: Ptr<Token>) -> Ptr<Node> {
-        Ptr::new(Node::new_lambda(self.loc(&lambda_t)))
+    pub(crate) fn call_lambda(&self, lambda_t: &'a Token) -> &'a Node {
+        Ptr::new(Node::new_lambda(self.loc(lambda_t)))
     }
 
     pub(crate) fn block(
         &self,
-        method_call: Ptr<Node>,
-        begin_t: Ptr<Token>,
+        method_call: &'a Node,
+        begin_t: &'a Token,
         block_args: ArgsType,
-        body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Result<Ptr<Node>, ()> {
+        body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> Result<&'a Node, ()> {
         let block_body = body;
 
         let validate_block_and_block_arg = |args: &List<Node>| {
@@ -1749,13 +1736,13 @@ impl Builder {
             |method_args: &List<Node>,
              keyword_expression_l: &Loc,
              block_args: ArgsType,
-             block_body: Maybe<Ptr<Node>>| {
+             block_body: Maybe<&'a Node>| {
                 // Code like "return foo 1 do end" is reduced in a weird sequence.
                 // Here, method_call is actually (return).
                 let actual_send = method_args[0].clone();
 
-                let begin_l = self.loc(&begin_t);
-                let end_l = self.loc(&end_t);
+                let begin_l = self.loc(begin_t);
+                let end_l = self.loc(end_t);
                 let expression_l = actual_send.expression().join(&end_l);
 
                 let block = match block_args {
@@ -1789,8 +1776,8 @@ impl Builder {
             || method_call.is_z_super()
             || method_call.is_lambda()
         {
-            let begin_l = self.loc(&begin_t);
-            let end_l = self.loc(&end_t);
+            let begin_l = self.loc(begin_t);
+            let end_l = self.loc(end_t);
             let expression_l = method_call.expression().join(&end_l);
 
             let result = match block_args {
@@ -1801,7 +1788,7 @@ impl Builder {
                     method_call,
                     numargs,
                     {
-                        let block_body: Maybe<Ptr<Node>> = block_body;
+                        let block_body: Maybe<&'a Node> = block_body;
                         block_body.expect("numblock always has body")
                     },
                     begin_l,
@@ -1846,8 +1833,8 @@ impl Builder {
 
         Ok(Ptr::new(result))
     }
-    pub(crate) fn block_pass(&self, amper_t: Ptr<Token>, value: Ptr<Node>) -> Ptr<Node> {
-        let amper_l = self.loc(&amper_t);
+    pub(crate) fn block_pass(&self, amper_t: &'a Token, value: &'a Node) -> &'a Node {
+        let amper_l = self.loc(amper_t);
         let expression_l = value.expression().join(&amper_l);
 
         Ptr::new(Node::new_block_pass(value, amper_l, expression_l))
@@ -1855,16 +1842,18 @@ impl Builder {
 
     pub(crate) fn attr_asgn(
         &self,
-        receiver: Ptr<Node>,
-        dot_t: Ptr<Token>,
-        selector_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let dot_l = self.loc(&dot_t);
-        let selector_l = self.loc(&selector_t);
+        receiver: &'a Node,
+        dot_t: &'a Token,
+        selector_t: &'a Token,
+    ) -> &'a Node {
+        let dot_l = self.loc(dot_t);
+        let selector_l = self.loc(selector_t);
         let expression_l = receiver.expression().join(&selector_l);
-        let receiver: Ptr<Node> = receiver;
+        let receiver: &'a Node = receiver;
 
-        let method_name = StringPtr::from(String::from(value(selector_t)) + "=");
+        let method_name = self
+            .bump
+            .alloc(StringPtr::from(String::from(value(selector_t)) + "="));
 
         match self.call_type_for_dot(&Maybe::some(dot_t)) {
             MethodCallType::Send => Ptr::new(Node::new_send(
@@ -1895,13 +1884,13 @@ impl Builder {
 
     pub(crate) fn index(
         &self,
-        recv: Ptr<Node>,
-        lbrack_t: Ptr<Token>,
-        mut indexes: Box<List<Node>>,
-        rbrack_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let begin_l = self.loc(&lbrack_t);
-        let end_l = self.loc(&rbrack_t);
+        recv: &'a Node,
+        lbrack_t: &'a Token,
+        mut indexes: List<'a, &'a Node<'a>>,
+        rbrack_t: &'a Token,
+    ) -> &'a Node {
+        let begin_l = self.loc(lbrack_t);
+        let end_l = self.loc(rbrack_t);
         let expression_l = recv.expression().join(&end_l);
 
         self.rewrite_hash_args_to_kwargs(&mut indexes);
@@ -1917,13 +1906,13 @@ impl Builder {
 
     pub(crate) fn index_asgn(
         &self,
-        recv: Ptr<Node>,
-        lbrack_t: Ptr<Token>,
-        indexes: Box<List<Node>>,
-        rbrack_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let begin_l = self.loc(&lbrack_t);
-        let end_l = self.loc(&rbrack_t);
+        recv: &'a Node,
+        lbrack_t: &'a Token,
+        indexes: List<'a, &'a Node<'a>>,
+        rbrack_t: &'a Token,
+    ) -> &'a Node {
+        let begin_l = self.loc(lbrack_t);
+        let end_l = self.loc(rbrack_t);
         let expression_l = recv.expression().join(&end_l);
 
         Ptr::new(Node::new_index_asgn(
@@ -1939,14 +1928,14 @@ impl Builder {
 
     pub(crate) fn binary_op(
         &self,
-        receiver: Ptr<Node>,
-        operator_t: Ptr<Token>,
-        arg: Ptr<Node>,
-    ) -> Result<Ptr<Node>, ()> {
+        receiver: &'a Node,
+        operator_t: &'a Token,
+        arg: &'a Node,
+    ) -> Result<&'a Node, ()> {
         self.value_expr(&receiver)?;
         self.value_expr(&arg)?;
 
-        let selector_l = Maybe::some(self.loc(&operator_t));
+        let selector_l = Maybe::some(self.loc(operator_t));
         let expression_l = join_exprs(&receiver, &arg);
 
         Ok(Ptr::new(Node::new_send(
@@ -1964,14 +1953,14 @@ impl Builder {
 
     pub(crate) fn match_op(
         &self,
-        receiver: Ptr<Node>,
-        match_t: Ptr<Token>,
-        arg: Ptr<Node>,
-    ) -> Result<Ptr<Node>, ()> {
+        receiver: &'a Node,
+        match_t: &'a Token,
+        arg: &'a Node,
+    ) -> Result<&'a Node, ()> {
         self.value_expr(&receiver)?;
         self.value_expr(&arg)?;
 
-        let selector_l = self.loc(&match_t);
+        let selector_l = self.loc(match_t);
         let expression_l = join_exprs(&receiver, &arg);
 
         let result = match self.static_regexp_captures(&receiver) {
@@ -1984,7 +1973,7 @@ impl Builder {
             }
             None => Node::new_send(
                 Maybe::some(receiver),
-                StringPtr::from("=~"),
+                self.bump.alloc(StringPtr::from("=~")),
                 list![arg.unptr()],
                 Maybe::none(),
                 Maybe::some(selector_l),
@@ -1998,17 +1987,17 @@ impl Builder {
         Ok(Ptr::new(result))
     }
 
-    pub(crate) fn unary_op(&self, op_t: Ptr<Token>, receiver: Ptr<Node>) -> Result<Ptr<Node>, ()> {
+    pub(crate) fn unary_op(&self, op_t: &'a Token, receiver: &'a Node) -> Result<&'a Node, ()> {
         self.value_expr(&receiver)?;
 
-        let selector_l = self.loc(&op_t);
+        let selector_l = self.loc(op_t);
         let expression_l = receiver.expression().join(&selector_l);
 
         let op = String::from(value(op_t));
         let method_name = if op == "+" || op == "-" { op + "@" } else { op };
         Ok(Ptr::new(Node::new_send(
             Maybe::some(receiver),
-            StringPtr::from(method_name),
+            self.bump.alloc(StringPtr::from(method_name)),
             list![],
             Maybe::none(),
             Maybe::some(selector_l),
@@ -2021,29 +2010,29 @@ impl Builder {
 
     pub(crate) fn not_op(
         &self,
-        not_t: Ptr<Token>,
-        begin_t: Maybe<Ptr<Token>>,
-        receiver: Maybe<Ptr<Node>>,
-        end_t: Maybe<Ptr<Token>>,
-    ) -> Result<Ptr<Node>, ()> {
+        not_t: &'a Token,
+        begin_t: Maybe<&'a Token>,
+        receiver: Maybe<&'a Node>,
+        end_t: Maybe<&'a Token>,
+    ) -> Result<&'a Node, ()> {
         if receiver.is_some() {
             let receiver = receiver.unwrap();
             self.value_expr(&receiver)?;
 
-            let begin_l = self.loc(&not_t);
+            let begin_l = self.loc(not_t);
             let end_l = self
                 .maybe_loc(&end_t)
-                .unwrap_or_else(|| receiver.expression().clone());
+                .unwrap_or_else(|| receiver.expression());
 
             let expression_l = begin_l.join(&end_l);
 
-            let selector_l = self.loc(&not_t);
+            let selector_l = self.loc(not_t);
             let begin_l = self.maybe_loc(&begin_t);
             let end_l = self.maybe_loc(&end_t);
 
             Ok(Ptr::new(Node::new_send(
                 Maybe::some(self.check_condition(receiver)),
-                StringPtr::from("!"),
+                self.bump.alloc(StringPtr::from("!")),
                 list![],
                 Maybe::none(),
                 Maybe::some(selector_l),
@@ -2061,11 +2050,11 @@ impl Builder {
 
             let nil_node = Ptr::new(Node::new_begin(list![], begin_l, end_l, expression_l));
 
-            let selector_l = self.loc(&not_t);
+            let selector_l = self.loc(not_t);
             let expression_l = nil_node.expression().join(&selector_l);
             Ok(Ptr::new(Node::new_send(
                 Maybe::some(nil_node),
-                StringPtr::from("!"),
+                self.bump.alloc(StringPtr::from("!")),
                 list![],
                 Maybe::none(),
                 Maybe::some(selector_l),
@@ -2086,16 +2075,16 @@ impl Builder {
     pub(crate) fn logical_op(
         &self,
         type_: LogicalOp,
-        lhs: Ptr<Node>,
-        op_t: Ptr<Token>,
-        rhs: Ptr<Node>,
-    ) -> Result<Ptr<Node>, ()> {
+        lhs: &'a Node,
+        op_t: &'a Token,
+        rhs: &'a Node,
+    ) -> Result<&'a Node, ()> {
         self.value_expr(&lhs)?;
 
-        let operator_l = self.loc(&op_t);
+        let operator_l = self.loc(op_t);
         let expression_l = join_exprs(&lhs, &rhs);
-        let lhs: Ptr<Node> = lhs;
-        let rhs: Ptr<Node> = rhs;
+        let lhs: &'a Node = lhs;
+        let rhs: &'a Node = rhs;
 
         let result = match type_ {
             LogicalOp::And => Node::new_and(lhs, rhs, operator_l, expression_l),
@@ -2108,24 +2097,24 @@ impl Builder {
 
     pub(crate) fn condition(
         &self,
-        cond_t: Ptr<Token>,
-        cond: Ptr<Node>,
-        then_t: Ptr<Token>,
-        if_true: Maybe<Ptr<Node>>,
-        else_t: Maybe<Ptr<Token>>,
-        if_false: Maybe<Ptr<Node>>,
-        end_t: Maybe<Ptr<Token>>,
-    ) -> Ptr<Node> {
+        cond_t: &'a Token,
+        cond: &'a Node,
+        then_t: &'a Token,
+        if_true: Maybe<&'a Node>,
+        else_t: Maybe<&'a Token>,
+        if_false: Maybe<&'a Node>,
+        end_t: Maybe<&'a Token>,
+    ) -> &'a Node {
         let end_l = self
             .maybe_loc(&end_t)
             .or_else(|| maybe_boxed_node_expr(&if_false))
             .or_else(|| self.maybe_loc(&else_t))
             .or_else(|| maybe_boxed_node_expr(&if_true))
-            .unwrap_or_else(|| self.loc(&then_t));
+            .unwrap_or_else(|| self.loc(then_t));
 
-        let expression_l = self.loc(&cond_t).join(&end_l);
-        let keyword_l = self.loc(&cond_t);
-        let begin_l = self.loc(&then_t);
+        let expression_l = self.loc(cond_t).join(&end_l);
+        let keyword_l = self.loc(cond_t);
+        let begin_l = self.loc(then_t);
         let else_l = self.maybe_loc(&else_t);
         let end_l = self.maybe_loc(&end_t);
 
@@ -2143,11 +2132,11 @@ impl Builder {
 
     pub(crate) fn condition_mod(
         &self,
-        if_true: Maybe<Ptr<Node>>,
-        if_false: Maybe<Ptr<Node>>,
-        cond_t: Ptr<Token>,
-        cond: Ptr<Node>,
-    ) -> Ptr<Node> {
+        if_true: Maybe<&'a Node>,
+        if_false: Maybe<&'a Node>,
+        cond_t: &'a Token,
+        cond: &'a Node,
+    ) -> &'a Node {
         let pre = match (if_true.as_ref(), if_false.as_ref()) {
             (None, None) => unreachable!("at least one of if_true/if_false is required"),
             (None, Some(if_false)) => if_false,
@@ -2156,7 +2145,7 @@ impl Builder {
         };
 
         let expression_l = pre.expression().join(cond.expression());
-        let keyword_l = self.loc(&cond_t);
+        let keyword_l = self.loc(cond_t);
 
         Ptr::new(Node::new_if_mod(
             self.check_condition(cond),
@@ -2169,15 +2158,15 @@ impl Builder {
 
     pub(crate) fn ternary(
         &self,
-        cond: Ptr<Node>,
-        question_t: Ptr<Token>,
-        if_true: Ptr<Node>,
-        colon_t: Ptr<Token>,
-        if_false: Ptr<Node>,
-    ) -> Ptr<Node> {
+        cond: &'a Node,
+        question_t: &'a Token,
+        if_true: &'a Node,
+        colon_t: &'a Token,
+        if_false: &'a Node,
+    ) -> &'a Node {
         let expression_l = join_exprs(&cond, &if_false);
-        let question_l = self.loc(&question_t);
-        let colon_l = self.loc(&colon_t);
+        let question_l = self.loc(question_t);
+        let colon_l = self.loc(colon_t);
 
         Ptr::new(Node::new_if_ternary(
             cond,
@@ -2193,17 +2182,17 @@ impl Builder {
 
     pub(crate) fn when(
         &self,
-        when_t: Ptr<Token>,
-        patterns: Box<List<Node>>,
-        then_t: Ptr<Token>,
-        body: Maybe<Ptr<Node>>,
-    ) -> Ptr<Node> {
-        let begin_l = self.loc(&then_t);
+        when_t: &'a Token,
+        patterns: List<'a, &'a Node<'a>>,
+        then_t: &'a Token,
+        body: Maybe<&'a Node>,
+    ) -> &'a Node {
+        let begin_l = self.loc(then_t);
 
         let expr_end_l = maybe_boxed_node_expr(&body)
             .or_else(|| maybe_node_expr(&patterns.last()))
-            .unwrap_or_else(|| self.loc(&when_t));
-        let when_l = self.loc(&when_t);
+            .unwrap_or_else(|| self.loc(when_t));
+        let when_l = self.loc(when_t);
         let expression_l = when_l.join(&expr_end_l);
 
         Ptr::new(Node::new_when(
@@ -2217,16 +2206,16 @@ impl Builder {
 
     pub(crate) fn case(
         &self,
-        case_t: Ptr<Token>,
-        expr: Maybe<Ptr<Node>>,
-        when_bodies: Box<List<Node>>,
-        else_t: Maybe<Ptr<Token>>,
-        else_body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let keyword_l = self.loc(&case_t);
+        case_t: &'a Token,
+        expr: Maybe<&'a Node>,
+        when_bodies: List<'a, &'a Node<'a>>,
+        else_t: Maybe<&'a Token>,
+        else_body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> &'a Node {
+        let keyword_l = self.loc(case_t);
         let else_l = self.maybe_loc(&else_t);
-        let end_l = self.loc(&end_t);
+        let end_l = self.loc(end_t);
         let expression_l = keyword_l.join(&end_l);
 
         Ptr::new(Node::new_case(
@@ -2245,16 +2234,16 @@ impl Builder {
     pub(crate) fn loop_(
         &self,
         loop_type: LoopType,
-        keyword_t: Ptr<Token>,
-        cond: Ptr<Node>,
-        do_t: Ptr<Token>,
-        body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let keyword_l = self.loc(&keyword_t);
-        let begin_l = self.loc(&do_t);
-        let end_l = self.loc(&end_t);
-        let expression_l = self.loc(&keyword_t).join(&end_l);
+        keyword_t: &'a Token,
+        cond: &'a Node,
+        do_t: &'a Token,
+        body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> &'a Node {
+        let keyword_l = self.loc(keyword_t);
+        let begin_l = self.loc(do_t);
+        let end_l = self.loc(end_t);
+        let expression_l = self.loc(keyword_t).join(&end_l);
 
         let cond = self.check_condition(cond);
 
@@ -2281,12 +2270,12 @@ impl Builder {
     pub(crate) fn loop_mod(
         &self,
         loop_type: LoopType,
-        body: Ptr<Node>,
-        keyword_t: Ptr<Token>,
-        cond: Ptr<Node>,
-    ) -> Ptr<Node> {
+        body: &'a Node,
+        keyword_t: &'a Token,
+        cond: &'a Node,
+    ) -> &'a Node {
         let expression_l = body.expression().join(cond.expression());
-        let keyword_l = self.loc(&keyword_t);
+        let keyword_l = self.loc(keyword_t);
 
         let cond = self.check_condition(cond);
 
@@ -2318,18 +2307,18 @@ impl Builder {
 
     pub(crate) fn for_(
         &self,
-        for_t: Ptr<Token>,
-        iterator: Ptr<Node>,
-        in_t: Ptr<Token>,
-        iteratee: Ptr<Node>,
-        do_t: Ptr<Token>,
-        body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let keyword_l = self.loc(&for_t);
-        let operator_l = self.loc(&in_t);
-        let begin_l = self.loc(&do_t);
-        let end_l = self.loc(&end_t);
+        for_t: &'a Token,
+        iterator: &'a Node,
+        in_t: &'a Token,
+        iteratee: &'a Node,
+        do_t: &'a Token,
+        body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> &'a Node {
+        let keyword_l = self.loc(for_t);
+        let operator_l = self.loc(in_t);
+        let begin_l = self.loc(do_t);
+        let end_l = self.loc(end_t);
         let expression_l = keyword_l.join(&end_l);
 
         Ptr::new(Node::new_for(
@@ -2349,12 +2338,12 @@ impl Builder {
     pub(crate) fn keyword_cmd(
         &self,
         type_: KeywordCmd,
-        keyword_t: Ptr<Token>,
-        lparen_t: Maybe<Ptr<Token>>,
-        mut args: Box<List<Node>>,
-        rparen_t: Maybe<Ptr<Token>>,
-    ) -> Result<Ptr<Node>, ()> {
-        let keyword_l = self.loc(&keyword_t);
+        keyword_t: &'a Token,
+        lparen_t: Maybe<&'a Token>,
+        mut args: List<'a, &'a Node<'a>>,
+        rparen_t: Maybe<&'a Token>,
+    ) -> Result<&'a Node, ()> {
+        let keyword_l = self.loc(keyword_t);
 
         if type_ == KeywordCmd::Yield && !args.is_empty() {
             if let Some(last_arg) = args.last() {
@@ -2378,7 +2367,7 @@ impl Builder {
         let expr_end_l = end_l
             .clone()
             .or_else(|| maybe_node_expr(&args.last()))
-            .unwrap_or_else(|| keyword_l.clone());
+            .unwrap_or_else(|| keyword_l);
 
         let expression_l = keyword_l.join(&expr_end_l);
 
@@ -2407,14 +2396,14 @@ impl Builder {
 
     pub(crate) fn preexe(
         &self,
-        preexe_t: Ptr<Token>,
-        lbrace_t: Ptr<Token>,
-        body: Maybe<Ptr<Node>>,
-        rbrace_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let keyword_l = self.loc(&preexe_t);
-        let begin_l = self.loc(&lbrace_t);
-        let end_l = self.loc(&rbrace_t);
+        preexe_t: &'a Token,
+        lbrace_t: &'a Token,
+        body: Maybe<&'a Node>,
+        rbrace_t: &'a Token,
+    ) -> &'a Node {
+        let keyword_l = self.loc(preexe_t);
+        let begin_l = self.loc(lbrace_t);
+        let end_l = self.loc(rbrace_t);
         let expression_l = keyword_l.join(&end_l);
 
         Ptr::new(Node::new_preexe(
@@ -2427,14 +2416,14 @@ impl Builder {
     }
     pub(crate) fn postexe(
         &self,
-        postexe_t: Ptr<Token>,
-        lbrace_t: Ptr<Token>,
-        body: Maybe<Ptr<Node>>,
-        rbrace_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let keyword_l = self.loc(&postexe_t);
-        let begin_l = self.loc(&lbrace_t);
-        let end_l = self.loc(&rbrace_t);
+        postexe_t: &'a Token,
+        lbrace_t: &'a Token,
+        body: Maybe<&'a Node>,
+        rbrace_t: &'a Token,
+    ) -> &'a Node {
+        let keyword_l = self.loc(postexe_t);
+        let begin_l = self.loc(lbrace_t);
+        let end_l = self.loc(rbrace_t);
         let expression_l = keyword_l.join(&end_l);
 
         Ptr::new(Node::new_postexe(
@@ -2450,21 +2439,21 @@ impl Builder {
 
     pub(crate) fn rescue_body(
         &self,
-        rescue_t: Ptr<Token>,
-        exc_list: Maybe<Ptr<Node>>,
-        assoc_t: Maybe<Ptr<Token>>,
-        exc_var: Maybe<Ptr<Node>>,
-        then_t: Maybe<Ptr<Token>>,
-        body: Maybe<Ptr<Node>>,
-    ) -> Ptr<Node> {
+        rescue_t: &'a Token,
+        exc_list: Maybe<&'a Node>,
+        assoc_t: Maybe<&'a Token>,
+        exc_var: Maybe<&'a Node>,
+        then_t: Maybe<&'a Token>,
+        body: Maybe<&'a Node>,
+    ) -> &'a Node {
         let end_l = maybe_boxed_node_expr(&body)
             .or_else(|| self.maybe_loc(&then_t))
             .or_else(|| maybe_boxed_node_expr(&exc_var))
             .or_else(|| maybe_boxed_node_expr(&exc_list))
-            .unwrap_or_else(|| self.loc(&rescue_t));
+            .unwrap_or_else(|| self.loc(rescue_t));
 
-        let expression_l = self.loc(&rescue_t).join(&end_l);
-        let keyword_l = self.loc(&rescue_t);
+        let expression_l = self.loc(rescue_t).join(&end_l);
+        let keyword_l = self.loc(rescue_t);
         let assoc_l = self.maybe_loc(&assoc_t);
         let begin_l = self.maybe_loc(&then_t);
 
@@ -2481,12 +2470,12 @@ impl Builder {
 
     pub(crate) fn begin_body(
         &self,
-        compound_stmt: Maybe<Ptr<Node>>,
-        rescue_bodies: Box<List<Node>>,
-        else_: Option<(Ptr<Token>, Maybe<Ptr<Node>>)>,
-        ensure: Option<(Ptr<Token>, Maybe<Ptr<Node>>)>,
-    ) -> Maybe<Ptr<Node>> {
-        let mut result: Maybe<Ptr<Node>>;
+        compound_stmt: Maybe<&'a Node>,
+        rescue_bodies: List<'a, &'a Node<'a>>,
+        else_: Option<(&'a Token, Maybe<&'a Node>)>,
+        ensure: Option<(&'a Token, Maybe<&'a Node>)>,
+    ) -> Maybe<&'a Node> {
+        let mut result: Maybe<&'a Node>;
 
         if !rescue_bodies.is_empty() {
             if let Some((else_t, else_)) = else_ {
@@ -2494,10 +2483,10 @@ impl Builder {
                     .or_else(|| maybe_node_expr(&rescue_bodies.first()))
                     .unwrap_or_else(|| unreachable!("can't compute begin_l"));
 
-                let end_l = maybe_boxed_node_expr(&else_).unwrap_or_else(|| self.loc(&else_t));
+                let end_l = maybe_boxed_node_expr(&else_).unwrap_or_else(|| self.loc(else_t));
 
                 let expression_l = begin_l.join(&end_l);
-                let else_l = self.loc(&else_t);
+                let else_l = self.loc(else_t);
 
                 result = Maybe::some(Ptr::new(Node::new_rescue(
                     compound_stmt,
@@ -2572,12 +2561,12 @@ impl Builder {
 
         if let Some((ensure_t, ensure)) = ensure {
             let ensure_body = ensure;
-            let keyword_l = self.loc(&ensure_t);
+            let keyword_l = self.loc(ensure_t);
 
-            let begin_l = maybe_boxed_node_expr(&result).unwrap_or_else(|| self.loc(&ensure_t));
+            let begin_l = maybe_boxed_node_expr(&result).unwrap_or_else(|| self.loc(ensure_t));
 
             let end_l = maybe_node_expr(&ensure_body.as_ref().map(|x| x.as_ref()))
-                .unwrap_or_else(|| self.loc(&ensure_t));
+                .unwrap_or_else(|| self.loc(ensure_t));
 
             let expression_l = begin_l.join(&end_l);
 
@@ -2596,7 +2585,7 @@ impl Builder {
     // Expression grouping
     //
 
-    pub(crate) fn compstmt(&self, statements: Box<List<Node>>) -> Maybe<Ptr<Node>> {
+    pub(crate) fn compstmt(&self, statements: List<'a, &'a Node<'a>>) -> Maybe<&'a Node> {
         match &statements[..] {
             [] => Maybe::none(),
             [_] => Maybe::some(Ptr::new(statements.take_first())),
@@ -2619,12 +2608,12 @@ impl Builder {
 
     pub(crate) fn begin(
         &self,
-        begin_t: Ptr<Token>,
-        body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let new_begin_l = self.loc(&begin_t);
-        let new_end_l = self.loc(&end_t);
+        begin_t: &'a Token,
+        body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> &'a Node {
+        let new_begin_l = self.loc(begin_t);
+        let new_end_l = self.loc(end_t);
         let new_expression_l = new_begin_l.join(&new_end_l);
 
         let new_begin_l = Maybe::some(new_begin_l);
@@ -2671,12 +2660,12 @@ impl Builder {
 
     pub(crate) fn begin_keyword(
         &self,
-        begin_t: Ptr<Token>,
-        body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let begin_l = self.loc(&begin_t);
-        let end_l = self.loc(&end_t);
+        begin_t: &'a Token,
+        body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> &'a Node {
+        let begin_l = self.loc(begin_t);
+        let end_l = self.loc(end_t);
         let expression_l = begin_l.join(&end_l);
 
         let begin_l = Maybe::some(begin_l);
@@ -2705,22 +2694,22 @@ impl Builder {
 
     pub(crate) fn case_match(
         &self,
-        case_t: Ptr<Token>,
-        expr: Ptr<Node>,
-        in_bodies: Box<List<Node>>,
-        else_t: Maybe<Ptr<Token>>,
-        else_body: Maybe<Ptr<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Ptr<Node> {
+        case_t: &'a Token,
+        expr: &'a Node,
+        in_bodies: List<'a, &'a Node<'a>>,
+        else_t: Maybe<&'a Token>,
+        else_body: Maybe<&'a Node>,
+        end_t: &'a Token,
+    ) -> &'a Node {
         let else_body = match (else_t.as_ref(), else_body.as_ref()) {
             (Some(else_t), None) => Maybe::some(Ptr::new(Node::new_empty_else(self.loc(else_t)))),
             _ => else_body,
         };
 
-        let keyword_l = self.loc(&case_t);
+        let keyword_l = self.loc(case_t);
         let else_l = self.maybe_loc(&else_t);
-        let end_l = self.loc(&end_t);
-        let expression_l = self.loc(&case_t).join(&end_l);
+        let end_l = self.loc(end_t);
+        let expression_l = self.loc(case_t).join(&end_l);
 
         Ptr::new(Node::new_case_match(
             expr,
@@ -2735,11 +2724,11 @@ impl Builder {
 
     pub(crate) fn match_pattern(
         &self,
-        value: Ptr<Node>,
-        assoc_t: Ptr<Token>,
-        pattern: Ptr<Node>,
-    ) -> Ptr<Node> {
-        let operator_l = self.loc(&assoc_t);
+        value: &'a Node,
+        assoc_t: &'a Token,
+        pattern: &'a Node,
+    ) -> &'a Node {
+        let operator_l = self.loc(assoc_t);
         let expression_l = join_exprs(&value, &pattern);
 
         Ptr::new(Node::new_match_pattern(
@@ -2752,11 +2741,11 @@ impl Builder {
 
     pub(crate) fn match_pattern_p(
         &self,
-        value: Ptr<Node>,
-        in_t: Ptr<Token>,
-        pattern: Ptr<Node>,
-    ) -> Ptr<Node> {
-        let operator_l = self.loc(&in_t);
+        value: &'a Node,
+        in_t: &'a Token,
+        pattern: &'a Node,
+    ) -> &'a Node {
+        let operator_l = self.loc(in_t);
         let expression_l = join_exprs(&value, &pattern);
 
         Ptr::new(Node::new_match_pattern_p(
@@ -2769,18 +2758,18 @@ impl Builder {
 
     pub(crate) fn in_pattern(
         &self,
-        in_t: Ptr<Token>,
-        pattern: Ptr<Node>,
-        guard: Maybe<Ptr<Node>>,
-        then_t: Ptr<Token>,
-        body: Maybe<Ptr<Node>>,
-    ) -> Ptr<Node> {
-        let keyword_l = self.loc(&in_t);
-        let begin_l = self.loc(&then_t);
+        in_t: &'a Token,
+        pattern: &'a Node,
+        guard: Maybe<&'a Node>,
+        then_t: &'a Token,
+        body: Maybe<&'a Node>,
+    ) -> &'a Node {
+        let keyword_l = self.loc(in_t);
+        let begin_l = self.loc(then_t);
 
         let expression_l = maybe_boxed_node_expr(&body)
             .or_else(|| maybe_boxed_node_expr(&guard))
-            .unwrap_or_else(|| pattern.expression().clone())
+            .unwrap_or_else(|| pattern.expression())
             .join(&keyword_l);
 
         Ptr::new(Node::new_in_pattern(
@@ -2793,22 +2782,22 @@ impl Builder {
         ))
     }
 
-    pub(crate) fn if_guard(&self, if_t: Ptr<Token>, cond: Ptr<Node>) -> Ptr<Node> {
-        let keyword_l = self.loc(&if_t);
+    pub(crate) fn if_guard(&self, if_t: &'a Token, cond: &'a Node) -> &'a Node {
+        let keyword_l = self.loc(if_t);
         let expression_l = keyword_l.join(cond.expression());
 
         Ptr::new(Node::new_if_guard(cond, keyword_l, expression_l))
     }
-    pub(crate) fn unless_guard(&self, unless_t: Ptr<Token>, cond: Ptr<Node>) -> Ptr<Node> {
-        let keyword_l = self.loc(&unless_t);
+    pub(crate) fn unless_guard(&self, unless_t: &'a Token, cond: &'a Node) -> &'a Node {
+        let keyword_l = self.loc(unless_t);
         let expression_l = keyword_l.join(cond.expression());
 
         Ptr::new(Node::new_unless_guard(cond, keyword_l, expression_l))
     }
 
-    pub(crate) fn match_var(&self, name_t: Ptr<Token>) -> Result<Ptr<Node>, ()> {
-        let name_l = self.loc(&name_t);
-        let expression_l = name_l.clone();
+    pub(crate) fn match_var(&self, name_t: &'a Token) -> Result<&'a Node, ()> {
+        let name_l = self.loc(name_t);
+        let expression_l = name_l;
         let name = value(name_t);
 
         self.check_lvar_name(name.as_str(), &name_l)?;
@@ -2818,8 +2807,8 @@ impl Builder {
         Ok(Ptr::new(Node::new_match_var(name, name_l, expression_l)))
     }
 
-    pub(crate) fn match_hash_var(&self, name_t: Ptr<Token>) -> Result<Ptr<Node>, ()> {
-        let expression_l = self.loc(&name_t);
+    pub(crate) fn match_hash_var(&self, name_t: &'a Token) -> Result<&'a Node, ()> {
+        let expression_l = self.loc(name_t);
         let name_l = expression_l.adjust_end(-1);
 
         let name = value(name_t);
@@ -2832,14 +2821,14 @@ impl Builder {
     }
     pub(crate) fn match_hash_var_from_str(
         &self,
-        begin_t: Ptr<Token>,
-        mut strings: Box<List<Node>>,
-        end_t: Ptr<Token>,
-    ) -> Result<Ptr<Node>, ()> {
+        begin_t: &'a Token,
+        mut strings: List<'a, &'a Node<'a>>,
+        end_t: &'a Token,
+    ) -> Result<&'a Node, ()> {
         if strings.len() != 1 {
             self.error(
                 DiagnosticMessage::new_symbol_literal_with_interpolation(),
-                &self.loc(&begin_t).join(&self.loc(&end_t)),
+                &self.loc(begin_t).join(&self.loc(end_t)),
             );
             return Err(());
         }
@@ -2854,7 +2843,7 @@ impl Builder {
             } = string.into_str().into_internal();
 
             let name = value.to_string_lossy();
-            let mut name_l = expression_l.clone();
+            let mut name_l = expression_l;
 
             self.check_lvar_name(name.as_str(), &name_l)?;
             self.check_duplicate_pattern_variable(name.as_str(), &name_l)?;
@@ -2880,7 +2869,7 @@ impl Builder {
             let expression_l = self
                 .loc(&begin_t)
                 .join(&expression_l)
-                .join(&self.loc(&end_t));
+                .join(&self.loc(end_t));
             Ptr::new(Node::new_match_var(name, name_l, expression_l))
         } else if string.is_begin() {
             let internal::Begin { statements, .. } = string.into_begin().into_internal();
@@ -2889,7 +2878,7 @@ impl Builder {
         } else {
             self.error(
                 DiagnosticMessage::new_symbol_literal_with_interpolation(),
-                &self.loc(&begin_t).join(&self.loc(&end_t)),
+                &self.loc(begin_t).join(&self.loc(end_t)),
             );
             return Err(());
         };
@@ -2899,9 +2888,9 @@ impl Builder {
 
     pub(crate) fn match_rest(
         &self,
-        star_t: Ptr<Token>,
-        name_t: Maybe<Ptr<Token>>,
-    ) -> Result<Ptr<Node>, ()> {
+        star_t: &'a Token,
+        name_t: Maybe<&'a Token>,
+    ) -> Result<&'a Node, ()> {
         let name = if name_t.is_none() {
             Maybe::none()
         } else {
@@ -2909,7 +2898,7 @@ impl Builder {
             Maybe::some(self.match_var(t)?)
         };
 
-        let operator_l = self.loc(&star_t);
+        let operator_l = self.loc(star_t);
         let expression_l = operator_l.maybe_join(&maybe_boxed_node_expr(&name));
 
         Ok(Ptr::new(Node::new_match_rest(
@@ -2921,10 +2910,10 @@ impl Builder {
 
     pub(crate) fn hash_pattern(
         &self,
-        lbrace_t: Maybe<Ptr<Token>>,
-        kwargs: Box<List<Node>>,
-        rbrace_t: Maybe<Ptr<Token>>,
-    ) -> Ptr<Node> {
+        lbrace_t: Maybe<&'a Token>,
+        kwargs: List<'a, &'a Node<'a>>,
+        rbrace_t: Maybe<&'a Token>,
+    ) -> &'a Node {
         let CollectionMap {
             begin_l,
             end_l,
@@ -2941,11 +2930,11 @@ impl Builder {
 
     pub(crate) fn array_pattern(
         &self,
-        lbrack_t: Maybe<Ptr<Token>>,
-        elements: Box<List<Node>>,
-        trailing_comma: Maybe<Ptr<Token>>,
-        rbrack_t: Maybe<Ptr<Token>>,
-    ) -> Ptr<Node> {
+        lbrack_t: Maybe<&'a Token>,
+        elements: List<'a, &'a Node<'a>>,
+        trailing_comma: Maybe<&'a Token>,
+        rbrack_t: Maybe<&'a Token>,
+    ) -> &'a Node {
         let CollectionMap {
             begin_l,
             end_l,
@@ -2982,10 +2971,10 @@ impl Builder {
 
     pub(crate) fn find_pattern(
         &self,
-        lbrack_t: Maybe<Ptr<Token>>,
-        elements: Box<List<Node>>,
-        rbrack_t: Maybe<Ptr<Token>>,
-    ) -> Ptr<Node> {
+        lbrack_t: Maybe<&'a Token>,
+        elements: List<'a, &'a Node<'a>>,
+        rbrack_t: Maybe<&'a Token>,
+    ) -> &'a Node {
         let CollectionMap {
             begin_l,
             end_l,
@@ -3002,14 +2991,14 @@ impl Builder {
 
     pub(crate) fn const_pattern(
         &self,
-        const_: Ptr<Node>,
-        ldelim_t: Ptr<Token>,
-        pattern: Ptr<Node>,
-        rdelim_t: Ptr<Token>,
-    ) -> Ptr<Node> {
-        let begin_l = self.loc(&ldelim_t);
-        let end_l = self.loc(&rdelim_t);
-        let expression_l = const_.expression().join(&self.loc(&rdelim_t));
+        const_: &'a Node,
+        ldelim_t: &'a Token,
+        pattern: &'a Node,
+        rdelim_t: &'a Token,
+    ) -> &'a Node {
+        let begin_l = self.loc(ldelim_t);
+        let end_l = self.loc(rdelim_t);
+        let expression_l = const_.expression().join(&self.loc(rdelim_t));
 
         Ptr::new(Node::new_const_pattern(
             const_,
@@ -3020,40 +3009,30 @@ impl Builder {
         ))
     }
 
-    pub(crate) fn pin(&self, pin_t: Ptr<Token>, var: Ptr<Node>) -> Ptr<Node> {
-        let operator_l = self.loc(&pin_t);
+    pub(crate) fn pin(&self, pin_t: &'a Token, var: &'a Node) -> &'a Node {
+        let operator_l = self.loc(pin_t);
         let expression_l = var.expression().join(&operator_l);
 
         Ptr::new(Node::new_pin(var, operator_l, expression_l))
     }
 
-    pub(crate) fn match_alt(
-        &self,
-        lhs: Ptr<Node>,
-        pipe_t: Ptr<Token>,
-        rhs: Ptr<Node>,
-    ) -> Ptr<Node> {
-        let operator_l = self.loc(&pipe_t);
+    pub(crate) fn match_alt(&self, lhs: &'a Node, pipe_t: &'a Token, rhs: &'a Node) -> &'a Node {
+        let operator_l = self.loc(pipe_t);
         let expression_l = join_exprs(&lhs, &rhs);
 
         Ptr::new(Node::new_match_alt(lhs, rhs, operator_l, expression_l))
     }
 
-    pub(crate) fn match_as(
-        &self,
-        value: Ptr<Node>,
-        assoc_t: Ptr<Token>,
-        as_: Ptr<Node>,
-    ) -> Ptr<Node> {
-        let operator_l = self.loc(&assoc_t);
+    pub(crate) fn match_as(&self, value: &'a Node, assoc_t: &'a Token, as_: &'a Node) -> &'a Node {
+        let operator_l = self.loc(assoc_t);
         let expression_l = join_exprs(&value, &as_);
 
         Ptr::new(Node::new_match_as(value, as_, operator_l, expression_l))
     }
 
-    pub(crate) fn match_nil_pattern(&self, dstar_t: Ptr<Token>, nil_t: Ptr<Token>) -> Ptr<Node> {
-        let operator_l = self.loc(&dstar_t);
-        let name_l = self.loc(&nil_t);
+    pub(crate) fn match_nil_pattern(&self, dstar_t: &'a Token, nil_t: &'a Token) -> &'a Node {
+        let operator_l = self.loc(dstar_t);
+        let name_l = self.loc(nil_t);
         let expression_l = operator_l.join(&name_l);
 
         Ptr::new(Node::new_match_nil_pattern(
@@ -3063,21 +3042,17 @@ impl Builder {
         ))
     }
 
-    pub(crate) fn match_pair(
-        &self,
-        p_kw_label: PKwLabel,
-        value: Ptr<Node>,
-    ) -> Result<Ptr<Node>, ()> {
+    pub(crate) fn match_pair(&self, p_kw_label: PKwLabel, value: &'a Node) -> Result<&'a Node, ()> {
         let result = match p_kw_label {
             PKwLabel::PlainLabel(label_t) => {
                 self.check_duplicate_pattern_key(
                     clone_value(&label_t).as_str(),
-                    &self.loc(&label_t),
+                    &self.loc(label_t),
                 )?;
                 self.pair_keyword(label_t, value)
             }
             PKwLabel::QuotedLabel((begin_t, parts, end_t)) => {
-                let label_loc = self.loc(&begin_t).join(&self.loc(&end_t));
+                let label_loc = self.loc(begin_t).join(&self.loc(end_t));
 
                 match self.static_string(&parts) {
                     Some(var_name) => self.check_duplicate_pattern_key(&var_name, &label_loc)?,
@@ -3096,7 +3071,7 @@ impl Builder {
         Ok(result)
     }
 
-    pub(crate) fn match_label(&self, p_kw_label: PKwLabel) -> Result<Ptr<Node>, ()> {
+    pub(crate) fn match_label(&self, p_kw_label: PKwLabel) -> Result<&'a Node, ()> {
         match p_kw_label {
             PKwLabel::PlainLabel(label_t) => self.match_hash_var(label_t),
             PKwLabel::QuotedLabel((begin_t, parts, end_t)) => {
@@ -3109,7 +3084,7 @@ impl Builder {
     // Verification
     //
 
-    pub(crate) fn check_condition(&self, cond: Ptr<Node>) -> Ptr<Node> {
+    pub(crate) fn check_condition(&self, cond: &'a Node) -> &'a Node {
         let cond = cond.unptr();
 
         if cond.is_begin() {
@@ -3178,7 +3153,7 @@ impl Builder {
                 expression_l,
             ))
         } else if cond.is_regexp() {
-            let expression_l = cond.expression().clone();
+            let expression_l = cond.expression();
 
             Ptr::new(Node::new_match_current_line(Ptr::new(cond), expression_l))
         } else {
@@ -3186,7 +3161,7 @@ impl Builder {
         }
     }
 
-    pub(crate) fn check_duplicate_args<'a>(
+    pub(crate) fn check_duplicate_args(
         &self,
         args: &'a [Node],
         map: &mut HashMap<String, &'a Node>,
@@ -3214,7 +3189,7 @@ impl Builder {
         }
     }
 
-    fn arg_name<'a>(&self, node: &'a Node) -> Option<&'a str> {
+    fn arg_name(&self, node: &'a Node) -> Option<&'a str> {
         if let Some(arg) = node.as_arg() {
             Some(arg.get_name().as_str())
         } else if let Some(optarg) = node.as_optarg() {
@@ -3236,7 +3211,7 @@ impl Builder {
         }
     }
 
-    fn arg_name_loc<'a>(&self, node: &'a Node) -> &'a Loc {
+    fn arg_name_loc(&self, node: &'a Node) -> &'a Loc {
         if let Some(arg) = node.as_arg() {
             arg.get_expression_l()
         } else if let Some(optarg) = node.as_optarg() {
@@ -3264,7 +3239,7 @@ impl Builder {
         }
     }
 
-    pub(crate) fn check_duplicate_arg<'a>(
+    pub(crate) fn check_duplicate_arg(
         &self,
         this_arg: &'a Node,
         map: &mut HashMap<String, &'a Node>,
@@ -3480,11 +3455,11 @@ impl Builder {
         None
     }
 
-    pub(crate) fn loc(&self, token: &Token) -> Loc {
-        token.loc().clone()
+    pub(crate) fn loc(&self, token: &'a Token<'a>) -> Loc {
+        token.loc()
     }
 
-    pub(crate) fn maybe_loc(&self, token: &Maybe<Ptr<Token>>) -> Maybe<Loc> {
+    pub(crate) fn maybe_loc(&self, token: &Maybe<&'a Token>) -> Maybe<Loc> {
         match token.as_ref() {
             Some(token) => Maybe::some(self.loc(token.as_ref())),
             None => Maybe::none(),
@@ -3493,9 +3468,9 @@ impl Builder {
 
     pub(crate) fn collection_map(
         &self,
-        begin_t: &Maybe<Ptr<Token>>,
+        begin_t: &Maybe<&'a Token>,
         parts: &[Node],
-        end_t: &Maybe<Ptr<Token>>,
+        end_t: &Maybe<&'a Token>,
     ) -> CollectionMap {
         let begin_l = self.maybe_loc(begin_t);
         let end_l = self.maybe_loc(end_t);
@@ -3514,7 +3489,7 @@ impl Builder {
         }
     }
 
-    pub(crate) fn is_heredoc(&self, begin_t: &Maybe<Ptr<Token>>) -> bool {
+    pub(crate) fn is_heredoc(&self, begin_t: &Maybe<&'a Token>) -> bool {
         if let Some(begin_t) = begin_t.as_ref() {
             if clone_value(begin_t.as_ref()).as_str().starts_with("<<") {
                 return true;
@@ -3525,9 +3500,9 @@ impl Builder {
 
     pub(crate) fn heredoc_map(
         &self,
-        begin_t: &Maybe<Ptr<Token>>,
+        begin_t: &Maybe<&'a Token>,
         parts: &[Node],
-        end_t: &Maybe<Ptr<Token>>,
+        end_t: &Maybe<&'a Token>,
     ) -> HeredocMap {
         let begin_t = begin_t.as_ref().expect("bug: begin_t must be Some");
         let end_t = end_t.as_ref().expect("heredoc must have end_t");
@@ -3565,8 +3540,8 @@ impl Builder {
         }
     }
 
-    fn void_value<'a>(&self, node: &'a Node) -> Option<&'a Node> {
-        let check_stmts = |statements: &'a List<Node>| {
+    fn void_value(&self, node: &'a Node) -> Option<&'a Node> {
+        let check_stmts = |statements: List<Node>| {
             if let Some(last_stmt) = statements.last() {
                 self.void_value(last_stmt)
             } else {
@@ -3583,7 +3558,7 @@ impl Builder {
         };
 
         let check_maybe_condition =
-            |if_true: &'a Maybe<Ptr<Node>>, if_false: &'a Maybe<Ptr<Node>>| match (
+            |if_true: &'a Maybe<&'a Node>, if_false: &'a Maybe<&'a Node>| match (
                 if_true.as_ref(),
                 if_false.as_ref(),
             ) {
@@ -3632,7 +3607,7 @@ impl Builder {
             } = args.pop().unwrap().into_hash().into_internal();
 
             let kwargs = Node::new_kwargs(pairs, expression_l);
-            args.push(kwargs);
+            args.push(&kwargs);
         } else if len > 1 && args[len - 1].is_block_pass() && self.is_kwargs(&args[len - 2]) {
             let block_pass = args.pop().unwrap();
             let internal::Hash {
@@ -3641,7 +3616,7 @@ impl Builder {
                 ..
             } = args.pop().unwrap().into_hash().into_internal();
             let kwargs = Node::new_kwargs(pairs, expression_l);
-            args.push(kwargs);
+            args.push(&kwargs);
             args.push(block_pass);
         }
     }
@@ -3655,49 +3630,54 @@ impl Builder {
     }
 }
 
-pub(crate) fn maybe_node_expr(node: &Option<&Node>) -> Maybe<Loc> {
+pub(crate) fn maybe_node_expr<'a>(node: &Option<&'a Node<'a>>) -> Maybe<Loc> {
     match node {
-        Some(node) => Maybe::some(node.expression().clone()),
+        Some(node) => Maybe::some(node.expression()),
         None => Maybe::none(),
     }
 }
 
-pub(crate) fn maybe_boxed_node_expr(node: &Maybe<Ptr<Node>>) -> Maybe<Loc> {
+pub(crate) fn maybe_boxed_node_expr<'a>(node: &Maybe<&'a Node>) -> Maybe<Loc> {
     match node.as_ref() {
-        Some(node) => Maybe::some(node.expression().clone()),
+        Some(node) => Maybe::some(node.expression()),
         None => Maybe::none(),
     }
 }
 
-pub(crate) fn collection_expr(nodes: &[Node]) -> Maybe<Loc> {
+pub(crate) fn collection_expr<'a>(nodes: &'a [Node]) -> Maybe<Loc> {
     join_maybe_exprs(&nodes.first(), &nodes.last())
 }
 
-pub(crate) fn value(token: Ptr<Token>) -> StringPtr {
+pub(crate) fn value<'a>(token: &'a Token<'a>) -> &'a String {
     token.unptr().into_string().unwrap()
 }
 
-pub(crate) fn lossy_value(token: Ptr<Token>) -> StringPtr {
-    token.to_string_lossy()
+pub(crate) fn lossy_value<'a>(token: &'a Token<'a>) -> &'a StringPtr {
+    // token.to_string_lossy()
+    todo!()
 }
 
-pub(crate) fn clone_value(token: &Token) -> StringPtr {
-    token.to_string_lossy()
+pub(crate) fn clone_value<'a>(token: &'a Token<'a>) -> &'a StringPtr {
+    // token.to_string_lossy()
+    todo!()
 }
 
-pub(crate) fn maybe_value(token: Maybe<Ptr<Token>>) -> Maybe<StringPtr> {
+pub(crate) fn maybe_value<'a>(token: Maybe<&'a Token<'a>>) -> Maybe<&'a StringPtr> {
     token.map(value)
 }
 
-pub(crate) fn join_exprs(lhs: &Node, rhs: &Node) -> Loc {
+pub(crate) fn join_exprs<'a>(lhs: &'a Node, rhs: &'a Node) -> Loc {
     lhs.expression().join(rhs.expression())
 }
 
-pub(crate) fn join_maybe_exprs(lhs: &Option<&Node>, rhs: &Option<&Node>) -> Maybe<Loc> {
+pub(crate) fn join_maybe_exprs<'a>(
+    lhs: &Option<&'a Node<'a>>,
+    rhs: &Option<&'a Node<'a>>,
+) -> Maybe<Loc> {
     join_maybe_locs(&maybe_node_expr(lhs), &maybe_node_expr(rhs))
 }
 
-pub(crate) fn join_maybe_locs(lhs: &Maybe<Loc>, rhs: &Maybe<Loc>) -> Maybe<Loc> {
+pub(crate) fn join_maybe_locs<'a>(lhs: &Maybe<Loc>, rhs: &Maybe<Loc>) -> Maybe<Loc> {
     match (lhs.as_ref(), rhs.as_ref()) {
         (None, None) => Maybe::none(),
         (None, Some(rhs)) => Maybe::some(rhs.clone()),
