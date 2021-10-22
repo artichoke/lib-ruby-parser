@@ -10,12 +10,12 @@ pub struct Diagnostic<'a> {
     /// Message of the diagnostic
     pub message: DiagnosticMessage<'a>,
     /// Location of the diagnostic
-    pub loc: Loc,
+    pub loc: &'a Loc,
 }
 
 impl<'a> Diagnostic<'a> {
     /// Construncts an instance of `Diagnostic`
-    pub fn new(level: ErrorLevel, message: DiagnosticMessage<'a>, loc: Loc) -> Self {
+    pub fn new(level: ErrorLevel, message: DiagnosticMessage<'a>, loc: &'a Loc) -> Self {
         Self {
             level,
             message,

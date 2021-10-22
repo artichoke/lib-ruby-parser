@@ -64,6 +64,7 @@ pub(crate) mod nodes {
     }
 
     pub(crate) fn has_ref_fields(node: &Node) -> bool {
+        return true;
         for field in node.fields.0 {
             use lib_ruby_parser_nodes::NodeFieldType::*;
 
@@ -256,11 +257,11 @@ pub(crate) mod node_fields {
             Node => "&'a Node<'a>",
             Nodes => "Vec<'a, &'a Node<'a>>",
             MaybeNode { .. } => "Maybe<&'a Node<'a>>",
-            Loc => "Loc",
-            MaybeLoc => "Option<Loc>",
+            Loc => "&'a Loc",
+            MaybeLoc => "&'a Option<&'a Loc>",
             Str { .. } => "String<'a>",
             MaybeStr { .. } => "Maybe<String<'a>>",
-            StringValue => "Bytes<'a>",
+            StringValue => "&'a Bytes<'a>",
             U8 => "u8",
         }
         .to_string()

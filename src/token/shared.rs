@@ -23,10 +23,10 @@ impl<'a> Token<'a> {
         self.token_value().as_raw()
     }
 
-    /// Consumes a token and returns an owned byte array of the token value
-    pub fn into_bytes(self) -> Vec<'a, u8> {
-        self.into_token_value().into_raw()
-    }
+    // /// Consumes a token and returns an owned byte array of the token value
+    // pub fn into_bytes(self) -> Vec<'a, u8> {
+    //     self.into_token_value().into_raw()
+    // }
 
     /// Converts token value into `&str`
     pub fn as_str_lossy(&self) -> Result<&str, std::str::Utf8Error> {
@@ -43,12 +43,12 @@ impl<'a> Token<'a> {
         self.token_value().to_string()
     }
 
-    /// Consumes a token and converts it into a string
-    pub fn into_string(
-        self,
-    ) -> Result<String<'a>, bumpalo::collections::string::FromUtf8Error<'a>> {
-        self.into_token_value().into_string()
-    }
+    // /// Consumes a token and converts it into a string
+    // pub fn into_string(
+    //     self,
+    // ) -> Result<String<'a>, bumpalo::collections::string::FromUtf8Error<'a>> {
+    //     self.into_token_value().into_string()
+    // }
 
     /// Returns name of the token
     pub fn token_name(&self) -> &'static str {

@@ -12,13 +12,13 @@ use crate::{Node, Loc, Bytes};
 #[allow(unused_imports)]
 use super::{{ helper node-rust-camelcase-name }};
 
-fn new_loc(_: &bumpalo::Bump) -> Loc {
-    Loc::new(1, 2)
+fn new_loc<'a>(bump: &'a bumpalo::Bump) -> &'a Loc {
+    Loc::new(bump, 1, 2)
 }
 
 #[allow(dead_code)]
-fn new_maybe_loc(bump: &bumpalo::Bump) -> Maybe<Loc> {
-    Maybe::some(new_loc(bump))
+fn new_maybe_loc<'a>(bump: &'a bumpalo::Bump) -> &'a Maybe<&'a Loc> {
+    bump.alloc(Maybe::some(new_loc(bump)))
 }
 
 #[allow(dead_code)]
@@ -57,8 +57,8 @@ fn new_u8(_: &bumpalo::Bump) -> u8 {
 }
 
 #[allow(dead_code)]
-fn new_bytes<'a>(bump: &'a bumpalo::Bump) -> Bytes<'a> {
-    Bytes::new(bump, bump_vec![in bump; 1, 2, 3])
+fn new_bytes<'a>(bump: &'a bumpalo::Bump) -> &'a Bytes<'a> {
+    bump.alloc(Bytes::new(bump, bump_vec![in bump; 1, 2, 3]))
 }
 
 fn new_test_node<'a>(bump: &'a bumpalo::Bump) -> &'a Node<'a> {
@@ -103,7 +103,7 @@ fn test_partial_eq() {
 
     let node = new_test_node(&bump);
     let same = new_test_node(&bump);
-    let other = Node::new_retry(&bump, Loc::new(100, 200));
+    let other = Node::new_retry(&bump, Loc::new(&bump, 100, 200));
 
     assert_eq!(node, same);
     assert_ne!(node, other);

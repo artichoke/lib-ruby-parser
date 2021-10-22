@@ -46,5 +46,5 @@ impl<'a> Observer<'a> for Finder<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;

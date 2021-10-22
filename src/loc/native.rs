@@ -1,3 +1,5 @@
+use bumpalo::Bump;
+
 /// Representation of any location in the given input
 #[repr(C)]
 #[derive(Clone, PartialEq, Eq, Copy, Default)]
@@ -10,8 +12,8 @@ pub struct Loc {
 
 impl Loc {
     /// Constructs a new Loc struct
-    pub fn new(begin: usize, end: usize) -> Loc {
-        Self { begin, end }
+    pub fn new<'a>(bump: &'a Bump, begin: usize, end: usize) -> &'a Loc {
+        bump.alloc(Self { begin, end })
     }
 
     /// Returns `begin` field of the `Loc`

@@ -42,8 +42,8 @@ pub use parser_options::ParserOptions;
 // mod parser;
 // pub use parser::Parser;
 
-mod builder;
-pub(crate) use builder::Builder;
+// mod builder;
+// pub(crate) use builder::Builder;
 
 mod current_arg_stack;
 pub(crate) use current_arg_stack::CurrentArgStack;

@@ -113,12 +113,12 @@ fn loc_getter(loc_name: &LocName) -> String {
         .map(|(node, nullable)| {
             let get_loc = if nullable {
                 format!(
-                    "return inner.get_{loc_name}().clone()",
+                    "return inner.get_{loc_name}().map(|v| v.to_owned()).to_owned()",
                     loc_name = loc_name.to_str()
                 )
             } else {
                 format!(
-                    "return Maybe::some(inner.get_{loc_name}().clone())",
+                    "return Maybe::some(inner.get_{loc_name}().to_owned())",
                     loc_name = loc_name.to_str()
                 )
             };

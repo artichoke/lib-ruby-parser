@@ -1,18 +1,22 @@
+use bumpalo::Bump;
+
 use super::MagicComment;
 use crate::source::MagicCommentKind;
 use crate::Loc;
 
-fn new_magic_comment() -> MagicComment {
+fn new_magic_comment<'a>(bump: &'a Bump) -> MagicComment<'a> {
     MagicComment::new(
         MagicCommentKind::frozen_string_literal(),
-        Loc::new(1, 2),
-        Loc::new(3, 4),
+        Loc::new(&bump, 1, 2),
+        Loc::new(&bump, 3, 4),
     )
 }
 
 #[test]
 fn test_new() {
-    let magic_comment = new_magic_comment();
+    let bump = Bump::new();
+
+    let magic_comment = new_magic_comment(&bump);
 
     assert!(magic_comment.kind().is_frozen_string_literal());
     assert_eq!(magic_comment.key_l().begin(), 1);
@@ -23,7 +27,9 @@ fn test_new() {
 
 #[test]
 fn test_debug() {
-    let magic_comment = new_magic_comment();
+    let bump = Bump::new();
+
+    let magic_comment = new_magic_comment(&bump);
 
     assert_eq!(
         format!("{:?}", magic_comment),
@@ -33,37 +39,25 @@ fn test_debug() {
 
 #[test]
 fn test_cmp() {
-    let magic_comment = new_magic_comment();
+    let bump = Bump::new();
+
+    let magic_comment = new_magic_comment(&bump);
 
     assert_eq!(
         magic_comment,
         MagicComment::new(
             MagicCommentKind::frozen_string_literal(),
-            Loc::new(1, 2),
-            Loc::new(3, 4),
-        )
-    );
-
-    assert_ne!(
-        magic_comment,
-        MagicComment::new(MagicCommentKind::encoding(), Loc::new(1, 2), Loc::new(3, 4),)
-    );
-
-    assert_ne!(
-        magic_comment,
-        MagicComment::new(
-            MagicCommentKind::frozen_string_literal(),
-            Loc::new(0, 2),
-            Loc::new(3, 4),
+            Loc::new(&bump, 1, 2),
+            Loc::new(&bump, 3, 4),
         )
     );
 
     assert_ne!(
         magic_comment,
         MagicComment::new(
-            MagicCommentKind::frozen_string_literal(),
-            Loc::new(1, 0),
-            Loc::new(3, 4),
+            MagicCommentKind::encoding(),
+            Loc::new(&bump, 1, 2),
+            Loc::new(&bump, 3, 4),
         )
     );
 
@@ -71,8 +65,8 @@ fn test_cmp() {
         magic_comment,
         MagicComment::new(
             MagicCommentKind::frozen_string_literal(),
-            Loc::new(1, 2),
-            Loc::new(0, 4),
+            Loc::new(&bump, 0, 2),
+            Loc::new(&bump, 3, 4),
         )
     );
 
@@ -80,15 +74,35 @@ fn test_cmp() {
         magic_comment,
         MagicComment::new(
             MagicCommentKind::frozen_string_literal(),
-            Loc::new(1, 2),
-            Loc::new(3, 0),
+            Loc::new(&bump, 1, 0),
+            Loc::new(&bump, 3, 4),
+        )
+    );
+
+    assert_ne!(
+        magic_comment,
+        MagicComment::new(
+            MagicCommentKind::frozen_string_literal(),
+            Loc::new(&bump, 1, 2),
+            Loc::new(&bump, 0, 4),
+        )
+    );
+
+    assert_ne!(
+        magic_comment,
+        MagicComment::new(
+            MagicCommentKind::frozen_string_literal(),
+            Loc::new(&bump, 1, 2),
+            Loc::new(&bump, 3, 0),
         )
     );
 }
 
 #[test]
 fn test_clone() {
-    let magic_comment = new_magic_comment();
+    let bump = Bump::new();
+
+    let magic_comment = new_magic_comment(&bump);
 
     assert_eq!(magic_comment, magic_comment.clone())
 }

@@ -17,7 +17,7 @@ pub struct Token<'a> {
     token_value: Bytes<'a>,
 
     /// Location of the token
-    loc: Loc,
+    loc: &'a Loc,
 
     /// Lex state **before** reading the token
     lex_state_before: LexState,
@@ -44,7 +44,7 @@ impl<'a> Token<'a> {
         bump: &'a Bump,
         token_type: i32,
         token_value: Bytes<'a>,
-        loc: Loc,
+        loc: &'a Loc,
         lex_state_before: LexState,
         lex_state_after: LexState,
     ) -> Self {
@@ -73,10 +73,10 @@ impl<'a> Token<'a> {
         self.token_value = token_value
     }
 
-    /// Consumes self, returns owned values of the token
-    pub fn into_token_value(self) -> Bytes<'a> {
-        self.token_value
-    }
+    // /// Consumes self, returns owned values of the token
+    // pub fn into_token_value(self) -> Bytes<'a> {
+    //     self.token_value
+    // }
 
     /// Returns location of the token
     pub fn loc(&self) -> &Loc {

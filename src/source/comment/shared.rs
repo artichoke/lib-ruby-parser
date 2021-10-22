@@ -2,9 +2,9 @@ use super::Comment;
 use crate::source::{CommentType, DecodedInput};
 use crate::Loc;
 
-impl Comment {
+impl<'a> Comment<'a> {
     /// Constructs a new comment by `Loc` and `Input`
-    pub fn new(location: Loc, input: &DecodedInput) -> Self {
+    pub fn new(location: &'a Loc, input: &DecodedInput) -> Self {
         let kind = match location.source(input) {
             Some(source) => {
                 if source.starts_with('#') {

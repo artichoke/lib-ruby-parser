@@ -22,7 +22,7 @@ fn rewritten_token<'a>(bump: &'a Bump) -> &'a Token<'a> {
             bump,
             bump_vec![in bump; b'r', b'e', b'w', b'r', b'i', b't', b't', b'e', b'n'],
         ),
-        Loc::new(1, 2),
+        Loc::new(bump, 1, 2),
         LexState { value: 1 },
         LexState { value: 2 },
     ))
@@ -113,7 +113,7 @@ fn call_dummy_rewriter<'a>(
             &bump,
             bump_vec![in &bump; b'i', b'n', b'i', b't', b'i', b'a', b'l'],
         ),
-        Loc::new(1, 2),
+        Loc::new(bump, 1, 2),
         LexState { value: 1 },
         LexState { value: 2 },
     ));

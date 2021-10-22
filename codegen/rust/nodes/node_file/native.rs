@@ -45,6 +45,7 @@ impl InnerNode for {{ helper node-rust-camelcase-name }}{{ if node-has-ref-field
         &self.expression_l
     }
 
+    #[allow(unused_qualifications)]
     fn inspected_children(&self, indent: usize) -> std::vec::Vec<std::string::String> {
         let mut result = InspectVec::new(indent);
 {{ each node-field }}<dnl>
@@ -132,11 +133,11 @@ mod local_helpers {
             NodeFieldType::Node => "&'a Node<'a>",
             NodeFieldType::Nodes => "bumpalo::collections::Vec<'a, &'a Node<'a>>",
             NodeFieldType::MaybeNode { .. } => "Option<&'a Node<'a>>",
-            NodeFieldType::Loc => "Loc",
-            NodeFieldType::MaybeLoc => "Option<Loc>",
+            NodeFieldType::Loc => "&'a Loc",
+            NodeFieldType::MaybeLoc => "&'a Option<&'a Loc>",
             NodeFieldType::Str { .. } => "String<'a>",
             NodeFieldType::MaybeStr { .. } => "Option<String<'a>>",
-            NodeFieldType::StringValue => "Bytes<'a>",
+            NodeFieldType::StringValue => "&'a Bytes<'a>",
             NodeFieldType::U8 => "u8",
         }
         .to_string()
@@ -149,7 +150,7 @@ mod local_helpers {
             NodeFieldType::Nodes => "&bumpalo::collections::Vec<'a, &'a Node<'a>>",
             NodeFieldType::MaybeNode { .. } => "&Option<&'a Node<'a>>",
             NodeFieldType::Loc => "&Loc",
-            NodeFieldType::MaybeLoc => "&Option<Loc>",
+            NodeFieldType::MaybeLoc => "&'a Option<&'a Loc>",
             NodeFieldType::Str { .. } => "&String<'a>",
             NodeFieldType::MaybeStr { .. } => "&Option<String<'a>>",
             NodeFieldType::StringValue => "&Bytes<'a>",
