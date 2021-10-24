@@ -23,6 +23,7 @@ pub mod source;
 
 #[allow(clippy::collapsible_if)]
 #[allow(clippy::collapsible_else_if)]
+#[allow(mutable_transmutes)]
 mod lexer;
 
 pub use lexer::Lexer;

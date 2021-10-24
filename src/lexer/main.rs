@@ -35,7 +35,7 @@ pub struct Lexer<'a> {
     pub(crate) lval_start: Option<usize>,
     pub(crate) lval_end: Option<usize>,
 
-    pub(crate) strterm: Option<StrTerm<'a>>,
+    pub(crate) strterm: Option<&'a StrTerm<'a>>,
     /// Current state of the lexer, used internally for testing
     pub lex_state: LexState,
     pub(crate) paren_nest: i32,
@@ -1171,14 +1171,17 @@ impl<'a> Lexer<'a> {
         term: u8,
         paren: Option<u8>,
         heredoc_end: Option<HeredocEnd<'a>>,
-    ) -> Option<StrTerm<'a>> {
-        Some(StrTerm::new_literal(StringLiteral::new(
-            0,
-            func,
-            paren,
-            term,
-            heredoc_end,
-        )))
+    ) -> Option<&'a StrTerm<'a>> {
+        Some(
+            self.bump
+                .alloc(StrTerm::new_literal(self.bump.alloc(StringLiteral::new(
+                    0,
+                    func,
+                    paren,
+                    term,
+                    heredoc_end,
+                )))),
+        )
     }
 
     pub(crate) fn loc(&self, begin_pos: usize, end_pos: usize) -> Loc {

@@ -99,14 +99,14 @@ impl<'a> Lexer<'a> {
 
         self.buffer.goto_eol();
 
-        self.strterm = Some(StrTerm::new_heredoc(HeredocLiteral::new(
+        self.strterm = Some(self.bump.alloc(StrTerm::new_heredoc(HeredocLiteral::new(
             self.buffer.lastline,
             offset,
             self.buffer.ruby_sourceline,
             len,
             quote,
             func,
-        )));
+        ))));
 
         self.token_flush();
         self.buffer.heredoc_indent = indent;

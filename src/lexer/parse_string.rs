@@ -13,14 +13,14 @@ const ESCAPE_CONTROL: usize = 1;
 const ESCAPE_META: usize = 2;
 
 impl<'a> Lexer<'a> {
-    fn take_strterm(&mut self) -> StringLiteral<'a> {
-        match self.strterm.take().map(|v| v) {
-            Some(StrTerm::StringLiteral(s)) => s,
+    fn take_strterm(&mut self) -> &'a mut StringLiteral<'a> {
+        match self.strterm.take() {
+            Some(StrTerm::StringLiteral(s)) => unsafe { std::mem::transmute(*s) },
             _ => unreachable!("strterm must be string"),
         }
     }
-    fn restore_strterm(&mut self, literal: StringLiteral<'a>) {
-        self.strterm = Some(StrTerm::StringLiteral(literal));
+    fn restore_strterm(&mut self, literal: &'a StringLiteral<'a>) {
+        self.strterm = Some(self.bump.alloc(StrTerm::StringLiteral(literal)));
     }
 
     pub(crate) fn parse_string(&mut self) -> i32 {
@@ -49,7 +49,7 @@ impl<'a> Lexer<'a> {
             if (func & STR_FUNC_REGEXP) != 0 {
                 return Self::tREGEXP_END;
             } else {
-                if let Some(heredoc_end) = quote.heredoc_end {
+                if let Some(heredoc_end) = &quote.heredoc_end {
                     self.lval_start = Some(heredoc_end.start);
                     self.lval_end = Some(heredoc_end.end);
                     self.set_yylval_str(&TokenBuf::new(self.bump, &heredoc_end.value));

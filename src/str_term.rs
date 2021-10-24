@@ -112,12 +112,12 @@ impl HeredocLiteral {
 #[derive(Debug, Clone)]
 pub(crate) enum StrTerm<'a> {
     // struct rb_strterm_struct
-    StringLiteral(StringLiteral<'a>),
+    StringLiteral(&'a StringLiteral<'a>),
     HeredocLiteral(HeredocLiteral),
 }
 
 impl<'a> StrTerm<'a> {
-    pub(crate) fn new_literal(literal: StringLiteral<'a>) -> Self {
+    pub(crate) fn new_literal(literal: &'a StringLiteral<'a>) -> Self {
         Self::StringLiteral(literal)
     }
 

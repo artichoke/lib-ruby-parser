@@ -58,7 +58,7 @@ pub(crate) enum PKwLabel<'a> {
     QuotedLabel((&'a Token<'a>, Vec<'a, &'a Node<'a>>, &'a Token<'a>)),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum ArgsType<'a> {
     Args(Maybe<&'a Node<'a>>),
     Numargs(u8),
@@ -3262,7 +3262,7 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn match_pair(
         &self,
-        p_kw_label: PKwLabel<'a>,
+        p_kw_label: &PKwLabel<'a>,
         value: &'a Node<'a>,
     ) -> Result<&'a Node<'a>, ()> {
         let result = match p_kw_label {
@@ -3284,17 +3284,17 @@ impl<'a> Builder<'a> {
                     }
                 }
 
-                self.pair_quoted(begin_t, parts, end_t, value)
+                self.pair_quoted(begin_t, take_vec(parts), end_t, value)
             }
         };
         Ok(result)
     }
 
-    pub(crate) fn match_label(&self, p_kw_label: PKwLabel<'a>) -> Result<&'a Node<'a>, ()> {
+    pub(crate) fn match_label(&self, p_kw_label: &PKwLabel<'a>) -> Result<&'a Node<'a>, ()> {
         match p_kw_label {
             PKwLabel::PlainLabel(label_t) => self.match_hash_var(label_t),
             PKwLabel::QuotedLabel((begin_t, parts, end_t)) => {
-                self.match_hash_var_from_str(begin_t, parts, end_t)
+                self.match_hash_var_from_str(begin_t, take_vec(parts), end_t)
             }
         }
     }
@@ -4017,4 +4017,9 @@ fn take_str<'a>(s: &String<'a>) -> String<'a> {
 fn take_maybe_node<'a>(maybe_node: &Option<&'a Node<'a>>) -> Option<&'a Node<'a>> {
     let maybe_node: &mut Option<&'a Node<'a>> = unsafe { std::mem::transmute(maybe_node) };
     maybe_node.take()
+}
+
+fn take_maybe_token<'a>(maybe_token: &Option<&'a Token<'a>>) -> Option<&'a Token<'a>> {
+    let maybe_token: &mut Option<&'a Token<'a>> = unsafe { std::mem::transmute(maybe_token) };
+    maybe_token.take()
 }

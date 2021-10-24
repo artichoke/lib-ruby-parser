@@ -408,9 +408,14 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | klBEGIN begin_block
                     {
-                        let BeginBlock { begin_t, body, end_t } = $<BeginBlock>2;
+                        let BeginBlock { begin_t, body, end_t } = *$<BeginBlock>2;
                         $$ = Value::new_node(
-                            self.builder.preexe($<Token>1, begin_t, body, end_t)
+                            self.builder.preexe(
+                                $<Token>1,
+                                begin_t,
+                                body,
+                                end_t
+                            )
                         );
                     }
                 ;
@@ -418,12 +423,13 @@ use crate::parser_options::InternalParserOptions;
      begin_block: tLCURLY top_compstmt tRCURLY
                     {
                         $$ = Value::new_begin_block(
-
-                            BeginBlock {
-                                begin_t: $<Token>1,
-                                body: $<MaybeBoxedNode>2,
-                                end_t: $<Token>3
-                            }
+                            self.bump.alloc(
+                                BeginBlock {
+                                    begin_t: $<Token>1,
+                                    body: $<MaybeBoxedNode>2,
+                                    end_t: $<Token>3
+                                }
+                            )
                         );
                     }
                 ;
@@ -997,11 +1003,12 @@ use crate::parser_options::InternalParserOptions;
                         self.context.push_def();
 
                         $$ = Value::new_defn_head(
-
-                            DefnHead {
-                                def_t: $<Token>1,
-                                name_t: $<Token>2
-                            }
+                            self.bump.alloc(
+                                DefnHead {
+                                    def_t: $<Token>1,
+                                    name_t: $<Token>2
+                                }
+                            )
                         );
                     }
                 ;
@@ -1017,13 +1024,14 @@ use crate::parser_options::InternalParserOptions;
                         self.context.push_defs();
 
                         $$ = Value::new_defs_head(
-
-                            DefsHead {
-                                def_t: $<Token>1,
-                                definee: $<BoxedNode>2,
-                                dot_t: $<Token>3,
-                                name_t: $<Token>5
-                            }
+                            self.bump.alloc(
+                                DefsHead {
+                                    def_t: $<Token>1,
+                                    definee: $<BoxedNode>2,
+                                    dot_t: $<Token>3,
+                                    name_t: $<Token>5
+                                }
+                            )
                         );
                     }
                 ;
@@ -1045,11 +1053,12 @@ use crate::parser_options::InternalParserOptions;
                         self.yylexer.cond.pop();
 
                         $$ = Value::new_expr_value_do(
-
-                            ExprValueDo {
-                                value: $<BoxedNode>2,
-                                do_t: $<Token>3
-                            }
+                            self.bump.alloc(
+                                ExprValueDo {
+                                    value: $<BoxedNode>2,
+                                    do_t: $<Token>3
+                                }
+                            )
                         );
                     }
                 ;
@@ -1092,14 +1101,16 @@ use crate::parser_options::InternalParserOptions;
                   brace_body tRCURLY
                     {
                         self.context.pop();
-                        let BraceBody { args_type, body } = $<BraceBody>3;
+                        let BraceBody { args_type, body } = *$<BraceBody>3;
                         $$ = Value::new_cmd_brace_block(
-                            CmdBraceBlock {
-                                begin_t: $<Token>1,
-                                args_type,
-                                body,
-                                end_t: $<Token>4
-                            }
+                            self.bump.alloc(
+                                CmdBraceBlock {
+                                    begin_t: $<Token>1,
+                                    args_type: args_type,
+                                    body: body,
+                                    end_t: $<Token>4
+                                }
+                            )
                         );
                     }
                 ;
@@ -1139,8 +1150,8 @@ use crate::parser_options::InternalParserOptions;
                             self.builder.block(
                                 method_call,
                                 begin_t,
-                                args_type,
-                                body,
+                                *args_type,
+                                take_maybe_node(body),
                                 end_t
                             )?
                         );
@@ -1174,8 +1185,8 @@ use crate::parser_options::InternalParserOptions;
                             self.builder.block(
                                 method_call,
                                 begin_t,
-                                args_type,
-                                body,
+                                *args_type,
+                                take_maybe_node(body),
                                 end_t
                             )?
                         );
@@ -1209,8 +1220,8 @@ use crate::parser_options::InternalParserOptions;
                             self.builder.block(
                                 method_call,
                                 begin_t,
-                                args_type,
-                                body,
+                                *args_type,
+                                take_maybe_node(body),
                                 end_t
                             )?
                         );
@@ -2485,12 +2496,13 @@ use crate::parser_options::InternalParserOptions;
       paren_args: tLPAREN2 opt_call_args rparen
                     {
                         $$ = Value::new_paren_args(
-
-                            ParenArgs {
-                                begin_t: $<Token>1,
-                                args: $<NodeList>2,
-                                end_t: $<Token>3
-                            }
+                            self.bump.alloc(
+                                ParenArgs {
+                                    begin_t: $<Token>1,
+                                    args: $<NodeList>2,
+                                    end_t: $<Token>3
+                                }
+                            )
                         );
                     }
                 | tLPAREN2 args tCOMMA args_forward rparen
@@ -2511,12 +2523,13 @@ use crate::parser_options::InternalParserOptions;
                         args.push(self.builder.forwarded_args($<Token>4));
 
                         $$ = Value::new_paren_args(
-
-                            ParenArgs {
-                                begin_t: $<Token>1,
-                                args,
-                                end_t: $<Token>5
-                            }
+                            self.bump.alloc(
+                                ParenArgs {
+                                    begin_t: $<Token>1,
+                                    args,
+                                    end_t: $<Token>5
+                                }
+                            )
                         );
                     }
                 | tLPAREN2 args_forward rparen
@@ -2534,12 +2547,13 @@ use crate::parser_options::InternalParserOptions;
                         }
 
                         $$ = Value::new_paren_args(
-
-                            ParenArgs {
-                                begin_t: $<Token>1,
-                                args: bump_vec![in self.bump; self.builder.forwarded_args($<Token>2) ],
-                                end_t: $<Token>3
-                            }
+                            self.bump.alloc(
+                                ParenArgs {
+                                    begin_t: $<Token>1,
+                                    args: bump_vec![in self.bump; self.builder.forwarded_args($<Token>2) ],
+                                    end_t: $<Token>3
+                                }
+                            )
                         );
                     }
                 ;
@@ -2547,24 +2561,26 @@ use crate::parser_options::InternalParserOptions;
   opt_paren_args: none
                     {
                         $$ = Value::new_opt_paren_args(
-
-                            OptParenArgs {
-                                begin_t: Maybe::none(),
-                                args: bump_vec![in self.bump;],
-                                end_t: Maybe::none()
-                            }
+                            self.bump.alloc(
+                                OptParenArgs {
+                                    begin_t: Maybe::none(),
+                                    args: bump_vec![in self.bump;],
+                                    end_t: Maybe::none()
+                                }
+                            )
                         );
                     }
                 | paren_args
                     {
                         let ParenArgs { begin_t, args, end_t } = $<ParenArgs>1;
                         $$ = Value::new_opt_paren_args(
-
-                            OptParenArgs {
-                                begin_t: Maybe::some(begin_t),
-                                args,
-                                end_t: Maybe::some(end_t)
-                            }
+                            self.bump.alloc(
+                                OptParenArgs {
+                                    begin_t: Maybe::some(*begin_t),
+                                    args: take_vec(args),
+                                    end_t: Maybe::some(*end_t)
+                                }
+                            )
                         );
                     }
                 ;
@@ -2986,7 +3002,7 @@ use crate::parser_options::InternalParserOptions;
                             bump_vec![in self.bump;],
                             Maybe::none()
                         );
-                        let BraceBlock { begin_t, args_type, body, end_t } = $<BraceBlock>2;
+                        let BraceBlock { begin_t, args_type, body, end_t } = *$<BraceBlock>2;
 
                         $$ = Value::new_node(
                             self.builder.block(
@@ -3004,7 +3020,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | method_call brace_block
                     {
-                        let BraceBlock { begin_t, args_type, body, end_t } = $<BraceBlock>2;
+                        let BraceBlock { begin_t, args_type, body, end_t } = *$<BraceBlock>2;
                         $$ = Value::new_node(
                             self.builder.block(
                                 $<BoxedNode>1,
@@ -3024,7 +3040,7 @@ use crate::parser_options::InternalParserOptions;
                   if_tail
                   k_end
                     {
-                        let IfTail { keyword_t, body: else_body } = $<IfTail>5;
+                        let IfTail { keyword_t, body: else_body } = *$<IfTail>5;
 
                         $$ = Value::new_node(
                             self.builder.condition(
@@ -3105,7 +3121,7 @@ use crate::parser_options::InternalParserOptions;
                             self.builder.case(
                                 $<Token>1,
                                 Maybe::some($<BoxedNode>2),
-                                when_bodies,
+                                take_vec(when_bodies),
                                 else_t,
                                 else_body,
                                 $<Token>6
@@ -3128,7 +3144,7 @@ use crate::parser_options::InternalParserOptions;
                             self.builder.case(
                                 $<Token>1,
                                 Maybe::none(),
-                                when_bodies,
+                                take_vec(when_bodies),
                                 else_t,
                                 else_body,
                                 $<Token>5
@@ -3146,7 +3162,7 @@ use crate::parser_options::InternalParserOptions;
                             self.builder.case_match(
                                 $<Token>1,
                                 $<BoxedNode>2,
-                                in_bodies,
+                                take_vec(in_bodies),
                                 else_t,
                                 else_body,
                                 $<Token>5
@@ -3191,8 +3207,8 @@ use crate::parser_options::InternalParserOptions;
                             self.builder.def_class(
                                 $<Token>1,
                                 $<BoxedNode>2,
-                                lt_t,
-                                value,
+                                take_maybe_token(lt_t),
+                                take_maybe_node(value),
                                 $<MaybeBoxedNode>5,
                                 $<Token>6
                             )
@@ -3510,34 +3526,36 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let (keyword_t, body) = $<OptElse>1.map(|else_| (Maybe::some(else_.else_t), else_.body)).unwrap_or_else(|| (Maybe::none(), Maybe::none()));
                         $$ = Value::new_if_tail(
-
-                            IfTail { keyword_t, body }
+                            self.bump.alloc(
+                                IfTail { keyword_t, body }
+                            )
                         );
                     }
                 | k_elsif expr_value then
                   compstmt
                   if_tail
                     {
-                        let IfTail { keyword_t, body: else_body } = $<IfTail>5;
+                        let IfTail { keyword_t, body: else_body } = *$<IfTail>5;
 
                         let elsif_t = $<Token>1;
 
                         $$ = Value::new_if_tail(
-
-                            IfTail {
-                                keyword_t: Maybe::some(elsif_t),
-                                body: Maybe::some(
-                                    self.builder.condition(
-                                        elsif_t,
-                                        $<BoxedNode>2,
-                                        $<Token>3,
-                                        $<MaybeBoxedNode>4,
-                                        keyword_t,
-                                        else_body,
-                                        Maybe::none()
+                            self.bump.alloc(
+                                IfTail {
+                                    keyword_t: Maybe::some(elsif_t),
+                                    body: Maybe::some(
+                                        self.builder.condition(
+                                            elsif_t,
+                                            $<BoxedNode>2,
+                                            $<Token>3,
+                                            $<MaybeBoxedNode>4,
+                                            keyword_t,
+                                            else_body,
+                                            Maybe::none()
+                                        )
                                     )
-                                )
-                            }
+                                }
+                            )
                         );
                     }
                 ;
@@ -3545,7 +3563,6 @@ use crate::parser_options::InternalParserOptions;
         opt_else: none
                     {
                         $$ = Value::new_opt_else(
-
                             None
                         );
                     }
@@ -3554,8 +3571,11 @@ use crate::parser_options::InternalParserOptions;
                         let else_t = $<Token>1;
                         let body   = $<MaybeBoxedNode>2;
                         $$ = Value::new_opt_else(
-
-                            Some(Else { else_t, body })
+                            Some(
+                                self.bump.alloc(
+                                    Else { else_t, body }
+                                )
+                            )
                         );
                     }
                 ;
@@ -3992,7 +4012,7 @@ opt_block_args_tail:
                         } else {
                             ArgsType::Args($<MaybeBoxedNode>3)
                         };
-                        let LambdaBody { begin_t, body, end_t } = $<LambdaBody>5;
+                        let LambdaBody { begin_t, body, end_t } = *$<LambdaBody>5;
 
                         self.max_numparam_stack.pop();
                         self.static_env.unextend();
@@ -4046,12 +4066,13 @@ opt_block_args_tail:
                     {
                         self.context.pop();
                         $$ = Value::new_lambda_body(
-
-                            LambdaBody {
-                                begin_t: $<Token>1,
-                                body: $<MaybeBoxedNode>3,
-                                end_t: $<Token>4
-                            }
+                            self.bump.alloc(
+                                LambdaBody {
+                                    begin_t: $<Token>1,
+                                    body: $<MaybeBoxedNode>3,
+                                    end_t: $<Token>4
+                                }
+                            )
                         );
                     }
                 | kDO_LAMBDA
@@ -4063,12 +4084,13 @@ opt_block_args_tail:
                     {
                         self.context.pop();
                         $$ = Value::new_lambda_body(
-
-                            LambdaBody {
-                                begin_t: $<Token>1,
-                                body: $<MaybeBoxedNode>3,
-                                end_t: $<Token>4
-                            }
+                            self.bump.alloc(
+                                LambdaBody {
+                                    begin_t: $<Token>1,
+                                    body: $<MaybeBoxedNode>3,
+                                    end_t: $<Token>4
+                                }
+                            )
                         );
                     }
                 ;
@@ -4080,23 +4102,24 @@ opt_block_args_tail:
                     }
                   do_body k_end
                     {
-                        let DoBody { args_type, body } = $<DoBody>3;
+                        let DoBody { args_type, body } = *$<DoBody>3;
                         self.context.pop();
                         $$ = Value::new_do_block(
-
-                            DoBlock {
-                                begin_t: $<Token>1,
-                                args_type,
-                                body,
-                                end_t: $<Token>4
-                            }
+                            self.bump.alloc(
+                                DoBlock {
+                                    begin_t: $<Token>1,
+                                    args_type,
+                                    body,
+                                    end_t: $<Token>4
+                                }
+                            )
                         );
                     }
                 ;
 
       block_call: command do_block
                     {
-                        let DoBlock { begin_t, args_type, body, end_t } = $<DoBlock>2;
+                        let DoBlock { begin_t, args_type, body, end_t } = *$<DoBlock>2;
                         $$ = Value::new_node(
                             self.builder.block(
                                 $<BoxedNode>1,
@@ -4115,9 +4138,9 @@ opt_block_args_tail:
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
                                 Maybe::some($<Token>3),
-                                begin_t,
-                                args,
-                                end_t
+                                *begin_t,
+                                take_vec(args),
+                                *end_t
                             )
                         );
                     }
@@ -4128,12 +4151,12 @@ opt_block_args_tail:
                             Maybe::some($<BoxedNode>1),
                             Maybe::some($<Token>2),
                             Maybe::some($<Token>3),
-                            begin_t,
-                            args,
-                            end_t
+                            *begin_t,
+                            take_vec(args),
+                            *end_t
                         );
 
-                        let BraceBlock { begin_t, args_type, body, end_t } = $<BraceBlock>5;
+                        let BraceBlock { begin_t, args_type, body, end_t } = *$<BraceBlock>5;
                         $$ = Value::new_node(
                             self.builder.block(
                                 method_call,
@@ -4155,7 +4178,7 @@ opt_block_args_tail:
                             Maybe::none()
                         );
 
-                        let DoBlock { begin_t, args_type, body, end_t } = $<DoBlock>5;
+                        let DoBlock { begin_t, args_type, body, end_t } = *$<DoBlock>5;
                         $$ = Value::new_node(
                             self.builder.block(
                                 method_call,
@@ -4178,7 +4201,7 @@ opt_block_args_tail:
                                 Maybe::none(),
                                 Maybe::some($<Token>1),
                                 Maybe::some(begin_t),
-                                args,
+                                take_vec(args),
                                 Maybe::some(end_t)
                             )
                         );
@@ -4192,9 +4215,9 @@ opt_block_args_tail:
                                 Maybe::some($<BoxedNode>1),
                                 Maybe::some($<Token>2),
                                 Maybe::some($<Token>3),
-                                begin_t,
-                                args,
-                                end_t
+                                *begin_t,
+                                take_vec(args),
+                                *end_t
                             )
                         );
                     }
@@ -4208,7 +4231,7 @@ opt_block_args_tail:
                                 Maybe::some($<Token>2),
                                 Maybe::some($<Token>3),
                                 Maybe::some(begin_t),
-                                args,
+                                take_vec(args),
                                 Maybe::some(end_t)
                             )
                         );
@@ -4236,7 +4259,7 @@ opt_block_args_tail:
                                 Maybe::some($<Token>2),
                                 Maybe::none(),
                                 Maybe::some(begin_t),
-                                args,
+                                take_vec(args),
                                 Maybe::some(end_t)
                             )
                         );
@@ -4251,7 +4274,7 @@ opt_block_args_tail:
                                 Maybe::some($<Token>2),
                                 Maybe::none(),
                                 Maybe::some(begin_t),
-                                args,
+                                take_vec(args),
                                 Maybe::some(end_t)
                             )
                         );
@@ -4265,7 +4288,7 @@ opt_block_args_tail:
                                 KeywordCmd::Super,
                                 $<Token>1,
                                 Maybe::some(begin_t),
-                                args,
+                                take_vec(args),
                                 Maybe::some(end_t)
                             )?
                         );
@@ -4302,17 +4325,18 @@ opt_block_args_tail:
                     }
                   brace_body tRCURLY
                     {
-                        let BraceBody { args_type, body } = $<BraceBody>3;
+                        let BraceBody { args_type, body } = *$<BraceBody>3;
                         self.context.pop();
 
                         $$ = Value::new_brace_block(
-
-                            BraceBlock {
-                                begin_t: $<Token>1,
-                                args_type,
-                                body,
-                                end_t: $<Token>4
-                            }
+                            self.bump.alloc(
+                                BraceBlock {
+                                    begin_t: $<Token>1,
+                                    args_type,
+                                    body,
+                                    end_t: $<Token>4
+                                }
+                            )
                         );
                     }
                 | k_do
@@ -4322,17 +4346,18 @@ opt_block_args_tail:
                     }
                   do_body k_end
                     {
-                        let DoBody { args_type, body } = $<DoBody>3;
+                        let DoBody { args_type, body } = *$<DoBody>3;
                         self.context.pop();
 
                         $$ = Value::new_brace_block(
-
-                            BraceBlock {
-                                begin_t: $<Token>1,
-                                args_type,
-                                body,
-                                end_t: $<Token>4
-                            }
+                            self.bump.alloc(
+                                BraceBlock {
+                                    begin_t: $<Token>1,
+                                    args_type,
+                                    body,
+                                    end_t: $<Token>4
+                                }
+                            )
                         );
                     }
                 ;
@@ -4354,11 +4379,12 @@ opt_block_args_tail:
                         self.static_env.unextend();
 
                         $$ = Value::new_brace_body(
-
-                            BraceBody {
-                                args_type,
-                                body: $<MaybeBoxedNode>3
-                            }
+                            self.bump.alloc(
+                                BraceBody {
+                                    args_type,
+                                    body: $<MaybeBoxedNode>3
+                                }
+                            )
                         );
                     }
                 ;
@@ -4382,8 +4408,9 @@ opt_block_args_tail:
                         self.yylexer.cmdarg.pop();
 
                         $$ = Value::new_do_body(
-
-                            DoBody { args_type, body: $<MaybeBoxedNode>3 }
+                            self.bump.alloc(
+                                DoBody { args_type, body: $<MaybeBoxedNode>3 }
+                            )
                         );
                     }
                 ;
@@ -4422,15 +4449,17 @@ opt_block_args_tail:
                   cases
                     {
                         let when = self.builder.when($<Token>1, $<NodeList>2, $<Token>3, $<MaybeBoxedNode>4);
-                        let Cases { mut when_bodies, opt_else } = $<Cases>5;
+                        let Cases { when_bodies, opt_else } = $<Cases>5;
+                        let mut when_bodies = take_vec(when_bodies);
 
                         let mut nodes = Vec::with_capacity_in(1 + when_bodies.len(), self.bump);
                         nodes.push(when);
                         nodes.append(&mut when_bodies);
 
                         $$ = Value::new_case_body(
-
-                            CaseBody { when_bodies: nodes, opt_else }
+                            self.bump.alloc(
+                                CaseBody { when_bodies: nodes, opt_else: *opt_else }
+                            )
                         );
                     }
                 ;
@@ -4438,16 +4467,18 @@ opt_block_args_tail:
            cases: opt_else
                     {
                         $$ = Value::new_cases(
-
-                            Cases { when_bodies: bump_vec![in self.bump;], opt_else: $<OptElse>1 }
+                            self.bump.alloc(
+                                Cases { when_bodies: bump_vec![in self.bump;], opt_else: $<OptElse>1 }
+                            )
                         );
                     }
                 | case_body
                     {
                         let CaseBody { when_bodies, .. } = $<CaseBody>1;
                         $$ = Value::new_cases(
-
-                            Cases { when_bodies, opt_else: None }
+                            self.bump.alloc(
+                                Cases { when_bodies: take_vec(when_bodies), opt_else: None }
+                            )
                         );
                     }
                 ;
@@ -4472,8 +4503,9 @@ opt_block_args_tail:
                   compstmt
                   p_cases
                     {
-                        let PCases { mut in_bodies, opt_else } = $<PCases>7;
-                        let PTopExpr { pattern, guard } = $<PTopExpr>3;
+                        let PCases { in_bodies, opt_else } = $<PCases>7;
+                        let mut in_bodies = take_vec(in_bodies);
+                        let PTopExpr { pattern, guard } = *$<PTopExpr>3;
 
                         let mut nodes = Vec::with_capacity_in(1 + in_bodies.len(), self.bump);
                         nodes.push(
@@ -4488,7 +4520,9 @@ opt_block_args_tail:
                         nodes.append(&mut in_bodies);
 
                         $$ = Value::new_p_case_body(
-                            PCaseBody { in_bodies: nodes, opt_else  }
+                            self.bump.alloc(
+                                PCaseBody { in_bodies: nodes, opt_else: *opt_else  }
+                            )
                         );
                     }
                 ;
@@ -4496,16 +4530,18 @@ opt_block_args_tail:
          p_cases: opt_else
                     {
                         $$ = Value::new_p_cases(
-
-                            PCases { in_bodies: bump_vec![in self.bump;], opt_else: $<OptElse>1 }
+                            self.bump.alloc(
+                                PCases { in_bodies: bump_vec![in self.bump;], opt_else: $<OptElse>1 }
+                            )
                         );
                     }
                 | p_case_body
                     {
                         let PCaseBody { in_bodies, .. } = $<PCaseBody>1;
                         $$ = Value::new_p_cases(
-
-                            PCases { in_bodies, opt_else: None }
+                            self.bump.alloc(
+                                PCases { in_bodies: take_vec(in_bodies), opt_else: None }
+                            )
                         );
                     }
                 ;
@@ -4513,24 +4549,27 @@ opt_block_args_tail:
       p_top_expr: p_top_expr_body
                     {
                         $$ = Value::new_p_top_expr(
-
-                            PTopExpr { pattern: $<BoxedNode>1, guard: Maybe::none() }
+                            self.bump.alloc(
+                                PTopExpr { pattern: $<BoxedNode>1, guard: Maybe::none() }
+                            )
                         );
                     }
                 | p_top_expr_body kIF_MOD expr_value
                     {
                         let guard = self.builder.if_guard($<Token>2, $<BoxedNode>3);
                         $$ = Value::new_p_top_expr(
-
-                            PTopExpr { pattern: $<BoxedNode>1, guard: Maybe::some(guard) }
+                            self.bump.alloc(
+                                PTopExpr { pattern: $<BoxedNode>1, guard: Maybe::some(guard) }
+                            )
                         );
                     }
                 | p_top_expr_body kUNLESS_MOD expr_value
                     {
                         let guard = self.builder.unless_guard($<Token>2, $<BoxedNode>3);
                         $$ = Value::new_p_top_expr(
-
-                            PTopExpr { pattern: $<BoxedNode>1, guard: Maybe::some(guard) }
+                            self.bump.alloc(
+                                PTopExpr { pattern: $<BoxedNode>1, guard: Maybe::some(guard) }
+                            )
                         );
                     }
                 ;
@@ -4552,14 +4591,15 @@ opt_block_args_tail:
                     }
                 | p_expr tCOMMA p_args
                     {
-                        let MatchPatternWithTrailingComma { mut elements, trailing_comma } = $<MatchPatternWithTrailingComma>3;
+                        let MatchPatternWithTrailingComma { elements, trailing_comma } = $<MatchPatternWithTrailingComma>3;
+                        let mut elements = take_vec(elements);
 
                         let mut nodes = Vec::with_capacity_in(1 + elements.len(), self.bump);
                         nodes.push($<Node>1);
                         nodes.append(&mut elements);
 
                         $$ = Value::new_node(
-                            self.builder.array_pattern(Maybe::none(), nodes, trailing_comma, Maybe::none())
+                            self.builder.array_pattern(Maybe::none(), nodes, take_maybe_token(trailing_comma), Maybe::none())
                         );
                     }
                 | p_find
@@ -4642,7 +4682,7 @@ opt_block_args_tail:
                     {
                         self.pattern_hash_keys.pop();
                         let MatchPatternWithTrailingComma { elements, trailing_comma } = $<MatchPatternWithTrailingComma>3;
-                        let pattern = self.builder.array_pattern(Maybe::none(), elements, trailing_comma, Maybe::none());
+                        let pattern = self.builder.array_pattern(Maybe::none(), take_vec(elements), *trailing_comma, Maybe::none());
                         $$ = Value::new_node(
                             self.builder.const_pattern(
                                 $<BoxedNode>1,
@@ -4701,7 +4741,7 @@ opt_block_args_tail:
                     {
                         self.pattern_hash_keys.pop();
                         let MatchPatternWithTrailingComma { elements, trailing_comma } = $<MatchPatternWithTrailingComma>3;
-                        let pattern = self.builder.array_pattern(Maybe::none(), elements, trailing_comma, Maybe::none());
+                        let pattern = self.builder.array_pattern(Maybe::none(), take_vec(elements), *trailing_comma, Maybe::none());
                         $$ = Value::new_node(
                             self.builder.const_pattern(
                                 $<BoxedNode>1,
@@ -4762,8 +4802,8 @@ opt_block_args_tail:
                         $$ = Value::new_node(
                             self.builder.array_pattern(
                                 Maybe::some($<Token>1),
-                                elements,
-                                trailing_comma,
+                                take_vec(elements),
+                                *trailing_comma,
                                 Maybe::some($<Token>3)
                             )
                         );
@@ -4838,11 +4878,12 @@ opt_block_args_tail:
           p_args: p_expr
                     {
                         $$ = Value::new_match_pattern_with_trailing_comma(
-
-                            MatchPatternWithTrailingComma {
-                                elements: bump_vec![in self.bump; $<Node>1 ],
-                                trailing_comma: Maybe::none()
-                            }
+                            self.bump.alloc(
+                                MatchPatternWithTrailingComma {
+                                    elements: bump_vec![in self.bump; $<Node>1 ],
+                                    trailing_comma: Maybe::none()
+                                }
+                            )
                         );
                     }
                 | p_args_head
@@ -4851,90 +4892,96 @@ opt_block_args_tail:
                     }
                 | p_args_head p_arg
                     {
-                        let mut elements = $<MatchPatternWithTrailingComma>1.elements;
+                        let mut elements = take_vec(& $<MatchPatternWithTrailingComma>1.elements);
                         elements.push($<Node>2);
 
                         $$ = Value::new_match_pattern_with_trailing_comma(
-
-                            MatchPatternWithTrailingComma {
-                                elements,
-                                trailing_comma: Maybe::none()
-                            }
+                            self.bump.alloc(
+                                MatchPatternWithTrailingComma {
+                                    elements,
+                                    trailing_comma: Maybe::none()
+                                }
+                            )
                         );
                     }
                 | p_args_head tSTAR tIDENTIFIER
                     {
                         let match_rest = self.builder.match_rest($<Token>2, Maybe::some($<Token>3))?;
 
-                        let mut elements = $<MatchPatternWithTrailingComma>1.elements;
+                        let mut elements = take_vec(& $<MatchPatternWithTrailingComma>1.elements);
                         elements.push(match_rest);
 
                         $$ = Value::new_match_pattern_with_trailing_comma(
-
-                            MatchPatternWithTrailingComma {
-                                elements,
-                                trailing_comma: Maybe::none()
-                            }
+                            self.bump.alloc(
+                                MatchPatternWithTrailingComma {
+                                    elements,
+                                    trailing_comma: Maybe::none()
+                                }
+                            )
                         );
                     }
                 | p_args_head tSTAR tIDENTIFIER tCOMMA p_args_post
                     {
                         let match_rest = self.builder.match_rest($<Token>2, Maybe::some($<Token>3))?;
 
-                        let mut elements = $<MatchPatternWithTrailingComma>1.elements;
+                        let mut elements = take_vec(& $<MatchPatternWithTrailingComma>1.elements);
                         let mut p_args_post = $<NodeList>5;
                         elements.reserve(1 + p_args_post.len());
                         elements.push(match_rest);
                         elements.append(&mut p_args_post);
 
                         $$ = Value::new_match_pattern_with_trailing_comma(
-
-                            MatchPatternWithTrailingComma {
-                                elements,
-                                trailing_comma: Maybe::none()
-                            }
+                            self.bump.alloc(
+                                MatchPatternWithTrailingComma {
+                                    elements,
+                                    trailing_comma: Maybe::none()
+                                }
+                            )
                         );
                     }
                 | p_args_head tSTAR
                     {
                         let match_rest = self.builder.match_rest($<Token>2, Maybe::none())?;
 
-                        let mut elements = $<MatchPatternWithTrailingComma>1.elements;
+                        let mut elements = take_vec(& $<MatchPatternWithTrailingComma>1.elements);
                         elements.push(match_rest);
 
                         $$ = Value::new_match_pattern_with_trailing_comma(
-
-                            MatchPatternWithTrailingComma {
-                                elements,
-                                trailing_comma: Maybe::none()
-                            }
+                            self.bump.alloc(
+                                MatchPatternWithTrailingComma {
+                                    elements,
+                                    trailing_comma: Maybe::none()
+                                }
+                            )
                         );
                     }
                 | p_args_head tSTAR tCOMMA p_args_post
                     {
                         let match_rest = self.builder.match_rest($<Token>2, Maybe::none())?;
 
-                        let mut elements = $<MatchPatternWithTrailingComma>1.elements;
+                        let mut elements = take_vec(& $<MatchPatternWithTrailingComma>1.elements);
                         let mut p_args_post = $<NodeList>4;
                         elements.push(match_rest);
                         elements.append(&mut p_args_post);
 
                         $$ = Value::new_match_pattern_with_trailing_comma(
-
-                            MatchPatternWithTrailingComma {
-                                elements,
-                                trailing_comma: Maybe::none()
-                            }
+                            self.bump.alloc(
+                                MatchPatternWithTrailingComma {
+                                    elements,
+                                    trailing_comma: Maybe::none()
+                                }
+                            )
                         );
                     }
                 | p_args_tail
                     {
                         $$ = Value::new_match_pattern_with_trailing_comma(
-
-                            MatchPatternWithTrailingComma {
-                                elements: $<NodeList>1,
-                                trailing_comma: Maybe::none()
-                            }
+                            self.bump.alloc(
+                                MatchPatternWithTrailingComma {
+                                    elements: $<NodeList>1,
+                                    trailing_comma: Maybe::none()
+                                }
+                            )
                         );
                     }
                 ;
@@ -4942,24 +4989,26 @@ opt_block_args_tail:
      p_args_head: p_arg tCOMMA
                     {
                         $$ = Value::new_match_pattern_with_trailing_comma(
-
-                            MatchPatternWithTrailingComma {
-                                elements: bump_vec![in self.bump;$<Node>1],
-                                trailing_comma: Maybe::some($<Token>2),
-                            }
+                            self.bump.alloc(
+                                MatchPatternWithTrailingComma {
+                                    elements: bump_vec![in self.bump;$<Node>1],
+                                    trailing_comma: Maybe::some($<Token>2),
+                                }
+                            )
                         );
                     }
                 | p_args_head p_arg tCOMMA
                     {
-                        let mut elements = $<MatchPatternWithTrailingComma>1.elements;
+                        let mut elements = take_vec(& $<MatchPatternWithTrailingComma>1.elements);
                         elements.push($<Node>2);
 
                         $$ = Value::new_match_pattern_with_trailing_comma(
-
-                            MatchPatternWithTrailingComma {
-                                elements,
-                                trailing_comma: Maybe::some($<Token>3),
-                            }
+                            self.bump.alloc(
+                                MatchPatternWithTrailingComma {
+                                    elements,
+                                    trailing_comma: Maybe::some($<Token>3),
+                                }
+                            )
                         );
                     }
                 ;
@@ -5081,15 +5130,17 @@ opt_block_args_tail:
       p_kw_label: tLABEL
                     {
                         $$ = Value::new_p_kw_label(
-
-                            PKwLabel::PlainLabel($<Token>1)
+                            self.bump.alloc(
+                                PKwLabel::PlainLabel($<Token>1)
+                            )
                         );
                     }
                 | tSTRING_BEG string_contents tLABEL_END
                     {
                         $$ = Value::new_p_kw_label(
-
-                            PKwLabel::QuotedLabel( ($<Token>1, $<NodeList>2, $<Token>3) )
+                            self.bump.alloc(
+                                PKwLabel::QuotedLabel( ($<Token>1, $<NodeList>2, $<Token>3) )
+                            )
                         );
                     }
                 ;
@@ -5341,7 +5392,7 @@ opt_block_args_tail:
                   compstmt
                   opt_rescue
                     {
-                        let ExcVar { assoc_t, exc_var } = $<ExcVar>3;
+                        let ExcVar { assoc_t, exc_var } = *$<ExcVar>3;
 
                         let exc_list = $<NodeList>2;
                         let exc_list = if exc_list.is_empty() {
@@ -5391,15 +5442,17 @@ opt_block_args_tail:
                         let assoc_t = Maybe::some($<Token>1);
                         let exc_var = Maybe::some($<BoxedNode>2);
                         $$ = Value::new_exc_var(
-
-                            ExcVar { assoc_t, exc_var }
+                            self.bump.alloc(
+                                ExcVar { assoc_t, exc_var }
+                            )
                         );
                     }
                 | none
                     {
                         $$ = Value::new_exc_var(
-
-                            ExcVar { assoc_t: Maybe::none(), exc_var: Maybe::none() }
+                            self.bump.alloc(
+                                ExcVar { assoc_t: Maybe::none(), exc_var: Maybe::none() }
+                            )
                         );
                     }
                 ;
@@ -5409,8 +5462,11 @@ opt_block_args_tail:
                         let ensure_t = $<Token>1;
                         let body = $<MaybeBoxedNode>2;
                         $$ = Value::new_opt_ensure(
-
-                            Some(Ensure { ensure_t, body })
+                            Some(
+                                self.bump.alloc(
+                                    Ensure { ensure_t, body }
+                                )
+                            )
                         );
                     }
                 | none
@@ -5993,15 +6049,17 @@ keyword_variable: kNIL
                         let lt_t  = Maybe::some($<Token>1);
                         let value = Maybe::some($<BoxedNode>3);
                         $$ = Value::new_superclass(
-
-                            Superclass { lt_t, value }
+                            self.bump.alloc(
+                                Superclass { lt_t, value }
+                            )
                         );
                     }
                 | /* none */
                     {
                         $$ = Value::new_superclass(
-
-                            Superclass { lt_t: Maybe::none(), value: Maybe::none() }
+                            self.bump.alloc(
+                                Superclass { lt_t: Maybe::none(), value: Maybe::none() }
+                            )
                         );
                     }
                 ;
@@ -7086,4 +7144,24 @@ impl<'a /*'*/> Parser<'a /*'*/> {
         assert!(self.pattern_variables.is_empty());
         assert!(self.pattern_hash_keys.is_empty());
     }
+}
+
+fn as_mut<T>(t: &T) -> &mut T {
+    unsafe { std::mem::transmute(t) }
+}
+
+fn take_vec<'a /*'*/>(vec: &Vec<'a /*'*/, &'a /*'*/ Node<'a /*'*/>>) -> Vec<'a /*'*/, &'a /*'*/ Node<'a /*'*/>> {
+    as_mut(vec).split_off(0)
+}
+
+fn take_str<'a /*'*/>(s: &String<'a /*'*/>) -> String<'a /*'*/> {
+    as_mut(s).split_off(0)
+}
+
+fn take_maybe_node<'a /*'*/>(maybe_node: &Option<&'a /*'*/ Node<'a /*'*/>>) -> Option<&'a /*'*/ Node<'a /*'*/>> {
+    as_mut(maybe_node).take()
+}
+
+fn take_maybe_token<'a /*'*/>(maybe_token: &Option<&'a /*'*/ Token<'a /*'*/>>) -> Option<&'a /*'*/ Token<'a /*'*/>> {
+    as_mut(maybe_token).take()
 }
