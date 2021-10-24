@@ -4,11 +4,11 @@ use super::MagicComment;
 use crate::source::MagicCommentKind;
 use crate::Loc;
 
-fn new_magic_comment<'a>(bump: &'a Bump) -> MagicComment<'a> {
+fn new_magic_comment<'a>(bump: &'a Bump) -> MagicComment {
     MagicComment::new(
         MagicCommentKind::frozen_string_literal(),
-        Loc::new(&bump, 1, 2),
-        Loc::new(&bump, 3, 4),
+        Loc::new(1, 2),
+        Loc::new(3, 4),
     )
 }
 
@@ -47,17 +47,22 @@ fn test_cmp() {
         magic_comment,
         MagicComment::new(
             MagicCommentKind::frozen_string_literal(),
-            Loc::new(&bump, 1, 2),
-            Loc::new(&bump, 3, 4),
+            Loc::new(1, 2),
+            Loc::new(3, 4),
         )
     );
 
     assert_ne!(
         magic_comment,
+        MagicComment::new(MagicCommentKind::encoding(), Loc::new(1, 2), Loc::new(3, 4),)
+    );
+
+    assert_ne!(
+        magic_comment,
         MagicComment::new(
-            MagicCommentKind::encoding(),
-            Loc::new(&bump, 1, 2),
-            Loc::new(&bump, 3, 4),
+            MagicCommentKind::frozen_string_literal(),
+            Loc::new(0, 2),
+            Loc::new(3, 4),
         )
     );
 
@@ -65,8 +70,8 @@ fn test_cmp() {
         magic_comment,
         MagicComment::new(
             MagicCommentKind::frozen_string_literal(),
-            Loc::new(&bump, 0, 2),
-            Loc::new(&bump, 3, 4),
+            Loc::new(1, 0),
+            Loc::new(3, 4),
         )
     );
 
@@ -74,8 +79,8 @@ fn test_cmp() {
         magic_comment,
         MagicComment::new(
             MagicCommentKind::frozen_string_literal(),
-            Loc::new(&bump, 1, 0),
-            Loc::new(&bump, 3, 4),
+            Loc::new(1, 2),
+            Loc::new(0, 4),
         )
     );
 
@@ -83,17 +88,8 @@ fn test_cmp() {
         magic_comment,
         MagicComment::new(
             MagicCommentKind::frozen_string_literal(),
-            Loc::new(&bump, 1, 2),
-            Loc::new(&bump, 0, 4),
-        )
-    );
-
-    assert_ne!(
-        magic_comment,
-        MagicComment::new(
-            MagicCommentKind::frozen_string_literal(),
-            Loc::new(&bump, 1, 2),
-            Loc::new(&bump, 3, 0),
+            Loc::new(1, 2),
+            Loc::new(3, 0),
         )
     );
 }

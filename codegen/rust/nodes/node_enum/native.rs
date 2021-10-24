@@ -13,7 +13,7 @@ crate::use_native_or_external!(String);
 
 /// Generic combination of all known nodes.
 #[allow(missing_docs)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 #[repr(C)]
 pub enum Node<'a> {
 {{ each node }}<dnl>
@@ -30,10 +30,20 @@ impl<'a> Node<'a> {
         }
     }
 
+    /// Returns location of the full node expression
+    pub fn expression(&self) -> &Loc {
+        match self {
+{{ each node }}<dnl>
+            | Node::{{ helper node-rust-camelcase-name }}({{ helper node-rust-camelcase-name }} { expression_l, .. })
+{{ end }}<dnl>
+            => expression_l
+        }
+    }
+
     // new_<node> FNs
 {{ each node }}<dnl>
     /// Constructs `Node::{{ helper node-rust-camelcase-name }}` variant
-    pub(crate) fn new_{{ helper node-lower-name }}(bump: &'a bumpalo::Bump, {{ each node-field }}{{ helper node-field-rust-field-name }}: {{ helper node-field-rust-field-type }}, {{ end }}) -> &'a Self {
+    pub(crate) fn new_{{ helper node-lower-name }}(bump: &'a bumpalo::Bump, {{ each node-field }}{{ helper node-field-rust-field-name }}: {{ helper node-field-rust-field-type }}, {{ end }}) -> &'a mut Self {
         bump.alloc(
             Self::{{ helper node-rust-camelcase-name }}({{ helper node-rust-camelcase-name }} { {{ each node-field }}{{ helper node-field-rust-field-name }}, {{ end }} })
         )

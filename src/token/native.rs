@@ -14,10 +14,10 @@ pub struct Token<'a> {
 
     /// Value of the token,
     /// e.g "42" for 42
-    token_value: Bytes<'a>,
+    pub token_value: Bytes<'a>,
 
     /// Location of the token
-    loc: &'a Loc,
+    loc: Loc,
 
     /// Lex state **before** reading the token
     lex_state_before: LexState,
@@ -44,7 +44,7 @@ impl<'a> Token<'a> {
         bump: &'a Bump,
         token_type: i32,
         token_value: Bytes<'a>,
-        loc: &'a Loc,
+        loc: Loc,
         lex_state_before: LexState,
         lex_state_after: LexState,
     ) -> Self {

@@ -9,7 +9,7 @@ fn new_diagnostic<'a>(bump: &'a Bump) -> Diagnostic<'a> {
     Diagnostic::new(
         ErrorLevel::error(),
         DiagnosticMessage::new_alias_nth_ref(),
-        Loc::new(bump, 1, 2),
+        Loc::new(1, 2),
     )
 }
 
@@ -52,7 +52,7 @@ fn test_renders() {
     let error = Diagnostic::new(
         ErrorLevel::warning(),
         DiagnosticMessage::new_fraction_after_numeric(),
-        Loc::new(&bump, 8, 12),
+        Loc::new(8, 12),
     );
 
     assert_eq!(

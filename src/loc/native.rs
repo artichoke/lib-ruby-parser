@@ -12,8 +12,8 @@ pub struct Loc {
 
 impl Loc {
     /// Constructs a new Loc struct
-    pub fn new<'a>(bump: &'a Bump, begin: usize, end: usize) -> &'a Loc {
-        bump.alloc(Self { begin, end })
+    pub fn new<'a>(begin: usize, end: usize) -> Loc {
+        Self { begin, end }
     }
 
     /// Returns `begin` field of the `Loc`

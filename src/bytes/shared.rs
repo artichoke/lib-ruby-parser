@@ -10,7 +10,7 @@ use super::Bytes;
 impl<'a> Bytes<'a> {
     /// Constructs an empty instance of `Bytes`
     pub fn empty(bump: &'a Bump) -> Bytes<'a> {
-        Self::new(bump, Vec::new_in(bump))
+        Self::new(Vec::new_in(bump))
     }
 
     /// Converts byte sequence to a string slice, returns error if there are invalid UTF-8 chars
@@ -54,6 +54,6 @@ impl<'a> Bytes<'a> {
 
     /// Clears inner data
     pub fn clear(&mut self) {
-        self.set_raw(Vec::new_in(self.bump))
+        self.raw.clear()
     }
 }

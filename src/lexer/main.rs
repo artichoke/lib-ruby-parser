@@ -170,12 +170,12 @@ impl<'a> Lexer<'a> {
                 // take raw value if nothing was manually captured
                 self.buffer
                     .substr_at(begin, end)
-                    .map(|s| Bytes::new(self.bump, Vec::from_iter_in(s.iter().cloned(), self.bump)))
+                    .map(|s| Bytes::new(Vec::from_iter_in(s.iter().cloned(), self.bump)))
             })
-            .unwrap_or_else(|| Bytes::new(self.bump, bump_vec![in self.bump; ]));
+            .unwrap_or_else(|| Bytes::new(bump_vec![in self.bump; ]));
 
         if token_type == Self::tNL {
-            token_value = Bytes::new(self.bump, bump_vec![in self.bump; b'\n']);
+            token_value = Bytes::new(bump_vec![in self.bump; b'\n']);
             end = begin + 1;
         }
 
@@ -183,7 +183,7 @@ impl<'a> Lexer<'a> {
             self.bump,
             token_type,
             token_value,
-            Loc::new(begin, end),
+            self.loc(begin, end),
             lex_state_before,
             self.lex_state,
         ));
@@ -1206,7 +1206,7 @@ impl<'a> Lexer<'a> {
         // nop
     }
 
-    pub(crate) fn yyerror0(&mut self, message: DiagnosticMessage) {
+    pub(crate) fn yyerror0(&mut self, message: DiagnosticMessage<'a>) {
         self.yyerror1(message, self.current_loc());
     }
 

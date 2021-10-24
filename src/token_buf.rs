@@ -5,20 +5,18 @@ use crate::Bytes;
 
 #[derive(Debug, Clone)]
 pub(crate) struct TokenBuf<'a> {
-    bump: &'a Bump,
     pub(crate) bytes: Bytes<'a>,
 }
 
 impl<'a> TokenBuf<'a> {
     pub(crate) fn new(bump: &'a Bump, bytes: &[u8]) -> Self {
         Self {
-            bump,
-            bytes: Bytes::new(bump, Vec::from_iter_in(bytes.iter().cloned(), bump)),
+            bytes: Bytes::new(Vec::from_iter_in(bytes.iter().cloned(), bump)),
         }
     }
 
-    pub(crate) fn take(&mut self) -> Self {
-        let mut out = Self::new(self.bump, &[]);
+    pub(crate) fn take(&mut self, bump: &'a Bump) -> Self {
+        let mut out = Self::new(bump, &[]);
         std::mem::swap(self, &mut out);
         out
     }
@@ -34,9 +32,10 @@ impl<'a> TokenBuf<'a> {
     }
 
     pub(crate) fn prepend(&mut self, part: &[u8]) {
-        let mut tmp = Vec::from_iter_in(part.iter().cloned(), self.bump);
-        tmp.extend(self.bytes.as_raw().iter());
-        self.bytes.set_raw(tmp.into());
+        self.bytes.prepend(part)
+        // let mut tmp = Vec::from_iter_in(part.iter().cloned(), self.bump);
+        // tmp.extend(self.bytes.as_raw().iter());
+        // self.bytes.set_raw(tmp.into());
     }
 
     pub(crate) fn borrow_string(&self) -> Result<&str, &[u8]> {
@@ -56,8 +55,7 @@ impl<'a> TokenBuf<'a> {
 
     pub(crate) fn default(bump: &'a Bump) -> Self {
         Self {
-            bump,
-            bytes: Bytes::new(bump, Vec::new_in(bump)),
+            bytes: Bytes::new(Vec::new_in(bump)),
         }
     }
 }

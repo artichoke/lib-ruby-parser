@@ -12,27 +12,27 @@ use crate::{Node, Loc, Bytes};
 #[allow(unused_imports)]
 use super::{{ helper node-rust-camelcase-name }};
 
-fn new_loc<'a>(bump: &'a bumpalo::Bump) -> &'a Loc {
-    Loc::new(bump, 1, 2)
+fn new_loc(_: &bumpalo::Bump) -> Loc {
+    Loc::new(1, 2)
 }
 
 #[allow(dead_code)]
-fn new_maybe_loc<'a>(bump: &'a bumpalo::Bump) -> &'a Maybe<&'a Loc> {
-    bump.alloc(Maybe::some(new_loc(bump)))
+fn new_maybe_loc(bump: &bumpalo::Bump) -> Maybe<Loc> {
+    Maybe::some(new_loc(bump))
 }
 
 #[allow(dead_code)]
-fn new_node<'a>(bump: &'a bumpalo::Bump) -> &'a Node<'a> {
+fn new_node<'a>(bump: &'a bumpalo::Bump) -> &'a mut Node<'a> {
     Node::new_retry(bump, new_loc(bump))
 }
 
 #[allow(dead_code)]
-fn new_node_ptr<'a>(bump: &'a bumpalo::Bump) -> &'a Node {
+fn new_node_ptr<'a>(bump: &'a bumpalo::Bump) -> &'a mut Node {
     new_node(bump)
 }
 
 #[allow(dead_code)]
-fn new_maybe_node_ptr<'a>(bump: &'a bumpalo::Bump) -> Maybe<&'a Node> {
+fn new_maybe_node_ptr<'a>(bump: &'a bumpalo::Bump) -> Maybe<&'a mut Node> {
     Maybe::some(new_node_ptr(bump))
 }
 
@@ -47,7 +47,7 @@ fn new_maybe_string_ptr<'a>(bump: &'a bumpalo::Bump) -> Maybe<String<'a>> {
 }
 
 #[allow(dead_code)]
-fn new_node_list<'a>(bump: &'a bumpalo::Bump) -> Vec<'a, &'a Node> {
+fn new_node_list<'a>(bump: &'a bumpalo::Bump) -> Vec<'a, &'a mut Node> {
     bump_vec![in bump; new_node(bump)]
 }
 
@@ -57,11 +57,11 @@ fn new_u8(_: &bumpalo::Bump) -> u8 {
 }
 
 #[allow(dead_code)]
-fn new_bytes<'a>(bump: &'a bumpalo::Bump) -> &'a Bytes<'a> {
-    bump.alloc(Bytes::new(bump, bump_vec![in bump; 1, 2, 3]))
+fn new_bytes<'a>(bump: &'a bumpalo::Bump) -> Bytes<'a> {
+    Bytes::new(bump_vec![in bump; 1, 2, 3])
 }
 
-fn new_test_node<'a>(bump: &'a bumpalo::Bump) -> &'a Node<'a> {
+fn new_test_node<'a>(bump: &'a bumpalo::Bump) -> &'a mut Node<'a> {
     Node::new_{{ helper node-lower-name }}(
         bump,
 {{ each node-field }}
@@ -103,7 +103,7 @@ fn test_partial_eq() {
 
     let node = new_test_node(&bump);
     let same = new_test_node(&bump);
-    let other = Node::new_retry(&bump, Loc::new(&bump, 100, 200));
+    let other = Node::new_retry(&bump, Loc::new(100, 200));
 
     assert_eq!(node, same);
     assert_ne!(node, other);

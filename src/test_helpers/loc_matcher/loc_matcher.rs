@@ -75,7 +75,7 @@ impl LocMatcher {
         }
     }
 
-    pub fn test(&self, root: &Node) -> Result<(), String> {
+    pub fn test<'a>(&self, root: &'a mut Node<'a>) -> Result<(), String> {
         match Finder::run(&self.pattern, root).unwrap() {
             Some(node) => match self.loc_name.get(&node).as_ref() {
                 Some(loc) => {
@@ -102,11 +102,11 @@ impl LocMatcher {
                     Ok(())
                 }
                 None => Err(format!(
-                    "failed to get {:?} of {:?} on {:?}",
-                    self.loc_name, self.pattern, root
+                    "failed to get {:?} of {:?}",
+                    self.loc_name, self.pattern
                 )),
             },
-            None => panic!("failed to find {:?} in {:?}", self.pattern, root.inspect(0)),
+            None => panic!("failed to find {:?}", self.pattern),
         }
     }
 }

@@ -352,7 +352,7 @@ impl Lexer<'_> {
     }
 
     fn heredoc_flush(&mut self) -> i32 {
-        let tokenbuf = self.tokenbuf.take();
+        let tokenbuf = self.tokenbuf.take(self.bump);
         self.heredoc_flush_str(&tokenbuf)
     }
 

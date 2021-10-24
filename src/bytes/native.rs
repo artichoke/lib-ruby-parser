@@ -2,8 +2,6 @@
 #[derive(Clone)]
 #[repr(C)]
 pub struct Bytes<'a> {
-    pub(crate) bump: &'a bumpalo::Bump,
-
     /// Raw vector of bytes
     pub raw: bumpalo::collections::Vec<'a, u8>,
 }
@@ -30,8 +28,15 @@ impl std::fmt::Debug for Bytes<'_> {
 
 impl<'a> Bytes<'a> {
     /// Constructs Bytes based on a given vector
-    pub fn new(bump: &'a bumpalo::Bump, raw: bumpalo::collections::Vec<'a, u8>) -> Bytes<'a> {
-        Self { bump, raw }
+    pub fn new(raw: bumpalo::collections::Vec<'a, u8>) -> Bytes<'a> {
+        Self { raw }
+    }
+
+    pub(crate) fn prepend(&mut self, part: &[u8]) {
+        let initial = self.raw.split_off(0);
+        self.raw.clear();
+        self.raw.extend_from_slice(part);
+        self.raw.extend_from_slice(initial.as_slice());
     }
 
     /// Returns a reference to inner data
@@ -52,6 +57,12 @@ impl<'a> Bytes<'a> {
     /// Appends a byte
     pub fn push(&mut self, item: u8) {
         self.raw.push(item);
+    }
+
+    pub(crate) fn take(&mut self) -> Self {
+        Self {
+            raw: self.raw.split_off(0),
+        }
     }
 }
 

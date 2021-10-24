@@ -66,7 +66,7 @@ impl Lexer<'_> {
                     return self.trailing_uc(byte);
                 }
                 suffix = self.number_literal_suffix(NUM_SUFFIX_ALL);
-                let mut tok = self.tokenbuf.take();
+                let mut tok = self.tokenbuf.take(self.bump);
                 tok.prepend(b"0");
                 return self.set_integer_literal(&mut tok, suffix);
             }
@@ -108,7 +108,7 @@ impl Lexer<'_> {
                     return self.trailing_uc(byte);
                 }
                 suffix = self.number_literal_suffix(NUM_SUFFIX_ALL);
-                let mut tok = self.tokenbuf.take();
+                let mut tok = self.tokenbuf.take(self.bump);
                 tok.prepend(b"0");
                 return self.set_integer_literal(&mut tok, suffix);
             }
@@ -150,7 +150,7 @@ impl Lexer<'_> {
                     return self.trailing_uc(byte);
                 }
                 suffix = self.number_literal_suffix(NUM_SUFFIX_ALL);
-                let mut tok = self.tokenbuf.take();
+                let mut tok = self.tokenbuf.take(self.bump);
                 tok.prepend(b"0");
                 return self.set_integer_literal(&mut tok, suffix);
             }
@@ -184,7 +184,7 @@ impl Lexer<'_> {
                 self.buffer.pushback(c);
                 suffix = self.number_literal_suffix(NUM_SUFFIX_ALL);
 
-                let mut tok = self.tokenbuf.take();
+                let mut tok = self.tokenbuf.take(self.bump);
                 tok.push(b'0');
                 return self.set_integer_literal(&mut tok, suffix);
             }
@@ -303,7 +303,7 @@ impl Lexer<'_> {
                 return Some(self.trailing_uc(*byte));
             }
             let suffix = self.number_literal_suffix(NUM_SUFFIX_ALL);
-            let mut tok = self.tokenbuf.take();
+            let mut tok = self.tokenbuf.take(self.bump);
             tok.prepend(b"0");
             return Some(self.set_integer_literal(&mut tok, suffix));
         }
@@ -349,18 +349,18 @@ impl Lexer<'_> {
             let suffix =
                 self.number_literal_suffix(if seen_e { NUM_SUFFIX_I } else { NUM_SUFFIX_ALL });
             if (suffix & NUM_SUFFIX_R) != 0 {
-                let mut value = self.tokenbuf.take();
+                let mut value = self.tokenbuf.take(self.bump);
                 value.push(b'r');
                 token_type = Self::tRATIONAL;
                 tokenbuf = value
             } else {
-                tokenbuf = self.tokenbuf.take();
+                tokenbuf = self.tokenbuf.take(self.bump);
             }
             // we don't parse the number
             return self.set_number_literal(&mut tokenbuf, token_type, suffix);
         }
         let suffix = self.number_literal_suffix(NUM_SUFFIX_ALL);
-        let mut tokenbuf = self.tokenbuf.take();
+        let mut tokenbuf = self.tokenbuf.take(self.bump);
         self.set_integer_literal(&mut tokenbuf, suffix)
     }
 

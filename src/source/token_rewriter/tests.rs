@@ -18,11 +18,8 @@ fn rewritten_token<'a>(bump: &'a Bump) -> &'a Token<'a> {
     bump.alloc(Token::new(
         bump,
         REWRITTEN_TOKEN_ID,
-        Bytes::new(
-            bump,
-            bump_vec![in bump; b'r', b'e', b'w', b'r', b'i', b't', b't', b'e', b'n'],
-        ),
-        Loc::new(bump, 1, 2),
+        Bytes::new(bump_vec![in bump; b'r', b'e', b'w', b'r', b'i', b't', b't', b'e', b'n']),
+        Loc::new(1, 2),
         LexState { value: 1 },
         LexState { value: 2 },
     ))
@@ -109,11 +106,8 @@ fn call_dummy_rewriter<'a>(
     let token = bump.alloc(Token::new(
         &bump,
         INITIAL_TOKEN_ID,
-        Bytes::new(
-            &bump,
-            bump_vec![in &bump; b'i', b'n', b'i', b't', b'i', b'a', b'l'],
-        ),
-        Loc::new(bump, 1, 2),
+        Bytes::new(bump_vec![in &bump; b'i', b'n', b'i', b't', b'i', b'a', b'l']),
+        Loc::new(1, 2),
         LexState { value: 1 },
         LexState { value: 2 },
     ));
@@ -136,10 +130,7 @@ fn test_keep() {
     assert_eq!(result.rewritten_token.token_type(), INITIAL_TOKEN_ID);
     assert_eq!(
         result.rewritten_token.token_value(),
-        &Bytes::new(
-            &bump,
-            bump_vec!(in &bump; b'i', b'n', b'i', b't', b'i', b'a', b'l')
-        )
+        &Bytes::new(bump_vec!(in &bump; b'i', b'n', b'i', b't', b'i', b'a', b'l'))
     );
     assert!(result.token_action.is_keep());
 }
@@ -174,10 +165,7 @@ fn test_rewrite() {
     assert_eq!(result.rewritten_token.token_type(), REWRITTEN_TOKEN_ID);
     assert_eq!(
         result.rewritten_token.token_value(),
-        &Bytes::new(
-            &bump,
-            bump_vec![in &bump; b'r', b'e', b'w', b'r', b'i', b't', b't', b'e', b'n']
-        )
+        &Bytes::new(bump_vec![in &bump; b'r', b'e', b'w', b'r', b'i', b't', b't', b'e', b'n'])
     );
     assert!(result.token_action.is_keep());
 }

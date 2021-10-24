@@ -4,15 +4,15 @@ use crate::Loc;
 /// A struct that represents a comment in Ruby
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Comment<'a> {
+pub struct Comment {
     /// Location of the comment (starts with `#` and ends with the last char)
-    pub location: &'a Loc,
+    pub location: Loc,
 
     /// Kind of the comment
     pub kind: CommentType,
 }
 
-impl<'a> Comment<'a> {
+impl Comment {
     /// Returns Location of the comment (starts with `#` and ends with the last char)
     pub fn location(&self) -> &Loc {
         &self.location
@@ -23,7 +23,7 @@ impl<'a> Comment<'a> {
         &self.kind
     }
 
-    pub(crate) fn make(location: &'a Loc, kind: CommentType) -> Self {
+    pub(crate) fn make(location: Loc, kind: CommentType) -> Self {
         Self { location, kind }
     }
 }

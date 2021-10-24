@@ -4,7 +4,7 @@ use crate::Loc;
 /// Representation of a magic comment in Ruby
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq)]
-pub struct MagicComment<'a> {
+pub struct MagicComment {
     /// Kind of a magic comment
     pub kind: MagicCommentKind,
 
@@ -14,7 +14,7 @@ pub struct MagicComment<'a> {
     /// # encoding: utf-8
     ///   ~~~~~~~~
     /// ```
-    pub key_l: &'a Loc,
+    pub key_l: Loc,
 
     /// Location of the "value":
     ///
@@ -22,12 +22,12 @@ pub struct MagicComment<'a> {
     /// # encoding: utf-8
     ///             ~~~~~
     /// ```
-    pub value_l: &'a Loc,
+    pub value_l: Loc,
 }
 
-impl<'a> MagicComment<'a> {
+impl MagicComment {
     /// Constructor
-    pub fn new(kind: MagicCommentKind, key_l: &'a Loc, value_l: &'a Loc) -> Self {
+    pub fn new(kind: MagicCommentKind, key_l: Loc, value_l: Loc) -> Self {
         Self {
             kind,
             key_l,

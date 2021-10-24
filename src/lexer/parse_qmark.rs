@@ -90,7 +90,7 @@ impl Lexer<'_> {
             self.tokadd(c);
         }
         self.tokfix();
-        let yylval = self.tokenbuf.take();
+        let yylval = self.tokenbuf.take(self.bump);
         self.set_yylval_str(&yylval);
         self.lex_state.set(EXPR_END);
         Ok(Self::tCHAR)

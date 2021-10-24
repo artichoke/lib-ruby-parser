@@ -145,7 +145,7 @@ impl<'a> Lexer<'a> {
 
     fn regx_options(&mut self) -> String {
         let mut c: MaybeByte;
-        let mut result = String::from("");
+        let mut result = String::from_str_in("", self.bump);
 
         self.newtok();
         loop {
@@ -828,7 +828,10 @@ impl<'a> Lexer<'a> {
 
     pub(crate) fn warn_space_char(&mut self, c: u8, prefix: &'static str) {
         self.warn(
-            DiagnosticMessage::new_invalid_character_syntax(format!("{}\\{}", prefix, c).into()),
+            DiagnosticMessage::new_invalid_character_syntax(String::from_str_in(
+                &format!("{}\\{}", prefix, c),
+                self.bump,
+            )),
             self.current_loc(),
         )
     }

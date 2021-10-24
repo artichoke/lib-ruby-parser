@@ -20,7 +20,7 @@ impl<'a> Diagnostic<'a> {
     /// (test.rb):1:      ^
     /// ```
     pub fn render(&self, bump: &'a Bump, input: &DecodedInput) -> Option<String> {
-        let (line_no, line_loc) = self.loc().expand_to_line(bump, input)?;
+        let (line_no, line_loc) = self.loc().expand_to_line(input)?;
         let line = line_loc.source(input)?;
 
         let filename = &input.name();

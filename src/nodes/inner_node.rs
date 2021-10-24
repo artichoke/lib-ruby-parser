@@ -7,12 +7,12 @@ use crate::Bytes;
 use crate::Loc;
 use crate::Node;
 
-pub trait InnerNode: std::fmt::Debug {
-    fn expression(&self) -> &Loc;
-    fn str_type(&self) -> &'static str;
-    fn inspected_children(&self, indent: usize) -> Vec<String>;
+pub trait InnerNode<'a>: std::fmt::Debug {
+    fn expression(&'a self) -> &Loc;
+    fn str_type(&'a self) -> &'static str;
+    fn inspected_children(&'a self, indent: usize) -> Vec<String>;
 
-    fn inspect(&self, indent: usize) -> String {
+    fn inspect(&'a self, indent: usize) -> String {
         let indented = "  ".repeat(indent);
         let mut sexp = format!("{}s(:{}", indented, self.str_type());
 
@@ -25,7 +25,7 @@ pub trait InnerNode: std::fmt::Debug {
         sexp
     }
 
-    fn print_with_locs(&self);
+    fn print_with_locs(&'a self);
 }
 
 pub(crate) struct InspectVec {
@@ -63,18 +63,18 @@ impl InspectVec {
         self.strings.push(format!(", {}", n))
     }
 
-    pub(crate) fn push_node(&mut self, node: &Node) {
+    pub(crate) fn push_node<'a>(&mut self, node: &'a Node<'a>) {
         self.strings
             .push(format!(",\n{}", node.inspect(self.indent + 1)))
     }
 
-    pub(crate) fn push_maybe_node(&mut self, node: &Maybe<&Node>) {
+    pub(crate) fn push_maybe_node<'a>(&mut self, node: &'a Maybe<&'a mut Node<'a>>) {
         if let Some(node) = node.as_ref() {
             self.push_node(node)
         }
     }
 
-    pub(crate) fn push_regex_options(&mut self, node: &Maybe<&Node>) {
+    pub(crate) fn push_regex_options<'a>(&mut self, node: &'a Maybe<&'a mut Node<'a>>) {
         if let Some(node) = node.as_ref() {
             self.push_node(node)
         } else {
@@ -86,7 +86,7 @@ impl InspectVec {
         }
     }
 
-    pub(crate) fn push_maybe_node_or_nil(&mut self, node: &Maybe<&Node>) {
+    pub(crate) fn push_maybe_node_or_nil<'a>(&mut self, node: &'a Maybe<&'a mut Node<'a>>) {
         if let Some(node) = node.as_ref() {
             self.push_node(node)
         } else {
@@ -94,7 +94,10 @@ impl InspectVec {
         }
     }
 
-    pub(crate) fn push_nodes<'a>(&mut self, nodes: &'a bumpalo::collections::Vec<&'a Node<'a>>) {
+    pub(crate) fn push_nodes<'a>(
+        &mut self,
+        nodes: &'a bumpalo::collections::Vec<&'a mut Node<'a>>,
+    ) {
         for node in nodes.iter() {
             self.push_node(node)
         }

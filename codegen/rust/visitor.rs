@@ -25,11 +25,11 @@ pub trait Observer<'a> {
 
     /// Called when entering any optional `Node`
     #[allow(unused_variables)]
-    fn on_option_node(&mut self, node: &Option<&'a Node<'a>>) {}
+    fn on_option_node(&mut self, node: &Option<&'a mut Node<'a>>) {}
 
     /// Called when entering any `Vec<Node>`
     #[allow(unused_variables)]
-    fn on_node_list(&mut self, nodes: &'a [&'a Node<'a>]) {}
+    fn on_node_list(&mut self, nodes: &'a [&'a mut Node<'a>]) {}
 
     /// Called when entering any AST node,
     /// `subitem` is different for different `Node` fields,
@@ -52,11 +52,11 @@ where
         self.observer.on_subitem(visit_as);
         self.observer.on_node(node);
 
+        match &*node {
 {{ each node }}<dnl>
-        if let Some(inner) = node.as_{{ helper node-lower-name }}() {
-            self.visit_{{ helper node-lower-name }}(inner)
-        }
+            Node::{{ helper node-rust-camelcase-name }}(node) => self.visit_{{ helper node-lower-name }}(node),
 {{ end }}
+        }
 
         self.observer.on_node_moving_up(node);
         self.observer.on_subitem_moving_up(visit_as);
@@ -68,7 +68,7 @@ where
     T: Observer<'a> + 'a,
 {
 {{ each node }}<dnl>
-    fn visit_{{ helper node-lower-name }}(&mut self, node: &'a {{ helper node-rust-camelcase-name }}) {
+    fn visit_{{ helper node-lower-name }}(&mut self, node: &'a {{ helper node-rust-camelcase-name }}{{ helper node-generic-lifetime }}) {
         self.observer.on_{{ helper node-lower-name }}(node);
 
 {{ each node-field }}<dnl>
@@ -135,9 +135,35 @@ mod local_helpers {
             }
         };
 
+        let get_prefix = match field.field_type {
+            Node => "&*",
+            Nodes => "&*",
+            MaybeNode { .. } => "",
+            Loc => "",
+            MaybeLoc => "",
+            Str { .. } => "",
+            MaybeStr { .. } => "",
+            StringValue => "",
+            U8 => "",
+        };
+
+        let get_suffix = match field.field_type {
+            Node => "",
+            Nodes => "",
+            MaybeNode { .. } => ".as_ref()",
+            Loc => "",
+            MaybeLoc => "",
+            Str { .. } => "",
+            MaybeStr { .. } => "",
+            StringValue => "",
+            U8 => "",
+        };
+
         format!(
-            "self.visit(node.get_{field_name}(), Item::{variant});",
-            field_name = field.snakecase_name,
+            "self.visit({get_prefix}node.{field_name}{get_suffix}, Item::{variant});",
+            get_prefix = get_prefix,
+            get_suffix = get_suffix,
+            field_name = field_name,
             variant = variant
         )
     }

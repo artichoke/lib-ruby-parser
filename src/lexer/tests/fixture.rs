@@ -1,4 +1,6 @@
 crate::use_native_or_external!(Maybe);
+use bumpalo::Bump;
+
 use crate::lex_states::*;
 use crate::Lexer;
 use std::fs;
@@ -84,11 +86,13 @@ fn lex_state(state: &str) -> Result<i32, &'static str> {
 }
 
 pub(crate) fn test_file(fixture_path: &str) {
+    let bump = Bump::new();
     let fixture = Fixture::new(fixture_path);
 
     let mut lexer = Lexer::new(
-        fixture.input.as_str(),
-        format!("(test {})", fixture_path),
+        &bump,
+        bumpalo::collections::Vec::from_iter_in(fixture.input.into_bytes().into_iter(), &bump),
+        bumpalo::collections::String::from_str_in(&format!("(test {})", fixture_path), &bump),
         Maybe::none(),
     );
     for var in fixture.vars {

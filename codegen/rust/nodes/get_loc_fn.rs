@@ -9,7 +9,7 @@ crate::use_native_or_external!(Maybe);
 impl LocName {{
     {loc_getters}
 
-    pub(crate) fn get(&self, node: &Node) -> Maybe<Loc> {{
+    pub(crate) fn get<'a>(&self, node: &'a Node<'a>) -> Maybe<Loc> {{
         match self {{
             {loc_branches}
         }}
@@ -136,7 +136,7 @@ fn loc_getter(loc_name: &LocName) -> String {
     let statements = statements.join(" else ");
 
     format!(
-        "fn get_{loc_name}(node: &Node) -> Maybe<Loc> {{
+        "fn get_{loc_name}<'a>(node: &'a Node<'a>) -> Maybe<Loc> {{
         {statements}
         else {{
             panic!(\"node {{}} doesn't support {loc_name} loc\", node.str_type())

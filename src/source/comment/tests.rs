@@ -7,15 +7,15 @@ use crate::Loc;
 #[test]
 fn test_comment_type() {
     let bump = Bump::new();
-    let comment = Comment::make(Loc::new(&bump, 1, 2), CommentType::inline());
+    let comment = Comment::make(Loc::new(1, 2), CommentType::inline());
 
     assert_eq!(comment.location().begin(), 1);
     assert_eq!(comment.location().end(), 2);
     assert!(comment.kind().is_inline());
 }
 
-fn comment<'a>(bump: &'a Bump) -> Comment<'a> {
-    Comment::make(Loc::new(&bump, 1, 2), CommentType::document())
+fn comment<'a>(bump: &'a Bump) -> Comment {
+    Comment::make(Loc::new(1, 2), CommentType::document())
 }
 
 #[test]
@@ -32,22 +32,22 @@ fn test_compare() {
     let bump = Bump::new();
 
     assert_eq!(
-        Comment::make(Loc::new(&bump, 1, 2), CommentType::document()),
+        Comment::make(Loc::new(1, 2), CommentType::document()),
         comment(&bump)
     );
 
     assert_ne!(
-        Comment::make(Loc::new(&bump, 2, 2), CommentType::document()),
+        Comment::make(Loc::new(2, 2), CommentType::document()),
         comment(&bump)
     );
 
     assert_ne!(
-        Comment::make(Loc::new(&bump, 1, 3), CommentType::document()),
+        Comment::make(Loc::new(1, 3), CommentType::document()),
         comment(&bump)
     );
 
     assert_ne!(
-        Comment::make(Loc::new(&bump, 1, 2), CommentType::inline()),
+        Comment::make(Loc::new(1, 2), CommentType::inline()),
         comment(&bump)
     );
 }
@@ -57,6 +57,6 @@ fn test_clone() {
     let bump = Bump::new();
 
     let comment = comment(&bump).clone();
-    assert_eq!(comment.location(), Loc::new(&bump, 1, 2));
+    assert_eq!(comment.location(), &Loc::new(1, 2));
     assert_eq!(comment.kind(), &CommentType::document());
 }
