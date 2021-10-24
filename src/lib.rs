@@ -30,7 +30,7 @@ pub mod source;
 mod static_environment;
 pub use static_environment::StaticEnvironment;
 
-// pub(crate) mod parse_value;
+pub(crate) mod parse_value;
 
 mod parser_options;
 pub use parser_options::ParserOptions;
