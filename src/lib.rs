@@ -35,8 +35,8 @@ pub(crate) mod parse_value;
 mod parser_options;
 pub use parser_options::ParserOptions;
 
-// mod parser_result;
-// pub use parser_result::ParserResult;
+mod parser_result;
+pub use parser_result::ParserResult;
 
 // #[allow(clippy::module_inception)]
 // mod parser;

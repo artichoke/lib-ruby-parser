@@ -7,45 +7,47 @@ use crate::{
 use crate::{ErrorLevel, LexState};
 
 crate::use_native_or_external!(Maybe);
-crate::use_native_or_external!(List);
+crate::use_native_or_external!(Vec);
 crate::use_native_or_external!(Ptr);
+crate::use_native_or_external!(String);
 
 fn ast<'a>(bump: &'a bumpalo::Bump) -> Maybe<&'a Node<'a>> {
-    Maybe::some(Ptr::new(Node::new_retry(Loc::new(1, 2))))
+    Maybe::some(Node::new_retry(bump, Loc::new(1, 2)))
 }
 
-fn tokens<'a>(bump: &'a bumpalo::Bump) -> List<Token<'a>> {
-    list![Token::new(
+fn tokens<'a>(bump: &'a bumpalo::Bump) -> Vec<'a, Token<'a>> {
+    bump_vec![in bump; Token::new(
+        bump,
         280,
-        Bytes::new(list![97, 98, 99]),
+        Bytes::new(bump, bump_vec![in bump; 97, 98, 99]),
         Loc::new(3, 4),
         LexState { value: 1 },
         LexState { value: 2 },
     )]
 }
 
-fn diagnostics<'a>(bump: &'a bumpalo::Bump) -> List<Diagnostic> {
-    list![Diagnostic::new(
+fn diagnostics<'a>(bump: &'a bumpalo::Bump) -> Vec<Diagnostic> {
+    bump_vec![in bump; Diagnostic::new(
         ErrorLevel::error(),
         DiagnosticMessage::new_alias_nth_ref(),
         Loc::new(5, 6),
     )]
 }
 
-fn comments<'a>(bump: &'a bumpalo::Bump) -> List<Comment> {
-    list![Comment::make(Loc::new(7, 8), CommentType::inline())]
+fn comments<'a>(bump: &'a bumpalo::Bump) -> Vec<Comment> {
+    bump_vec![in bump; Comment::make(Loc::new(7, 8), CommentType::inline())]
 }
-fn magic_comments<'a>(bump: &'a bumpalo::Bump) -> List<MagicComment> {
-    list![MagicComment::new(
+fn magic_comments<'a>(bump: &'a bumpalo::Bump) -> Vec<MagicComment> {
+    bump_vec![in bump; MagicComment::new(
         MagicCommentKind::warn_indent(),
         Loc::new(9, 10),
         Loc::new(11, 12),
     )]
 }
 fn input<'a>(bump: &'a bumpalo::Bump) -> DecodedInput<'a> {
-    let mut input = DecodedInput::named("foo");
-    input.set_bytes(list![1, 2, 3]);
-    input.set_lines(list![SourceLine::new(1, 2, false)]);
+    let mut input = DecodedInput::named(bump, String::from_str_in("foo", bump));
+    input.set_bytes(bump_vec![in bump; 1, 2, 3]);
+    input.set_lines(bump_vec![in bump; SourceLine::new(1, 2, false)]);
     input
 }
 

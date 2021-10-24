@@ -15,17 +15,17 @@ pub struct ParserResult<'a> {
 
     /// List of tokens returned by a Lexer and consumed by a Parser.
     /// Empty unless ParserOptions::record_tokens is set to true.
-    pub tokens: bumpalo::collections::Vec<'a, &'a Token<'a>>,
+    pub tokens: bumpalo::collections::Vec<'a, Token<'a>>,
 
     /// List of all diagnostics (errors and warings) that have been
     /// recorded during lexing and parsing
-    pub diagnostics: bumpalo::collections::Vec<'a, &'a Diagnostic>,
+    pub diagnostics: bumpalo::collections::Vec<'a, Diagnostic<'a>>,
 
     /// List of comments extracted from the source code.
-    pub comments: bumpalo::collections::Vec<'a, &'a Comment>,
+    pub comments: bumpalo::collections::Vec<'a, Comment>,
 
     /// List of magic comments extracted from the source code.
-    pub magic_comments: bumpalo::collections::Vec<'a, &'a MagicComment>,
+    pub magic_comments: bumpalo::collections::Vec<'a, MagicComment>,
 
     /// Input that was used for parsing.
     ///
@@ -42,11 +42,11 @@ pub struct ParserResult<'a> {
 impl<'a> ParserResult<'a> {
     pub(crate) fn new(
         ast: Option<&'a Node<'a>>,
-        tokens: bumpalo::collections::Vec<'a, &'a Token<'a>>,
-        diagnostics: bumpalo::collections::Vec<'a, &'a Diagnostic>,
-        comments: bumpalo::collections::Vec<'a, &'a Comment>,
-        magic_comments: bumpalo::collections::Vec<'a, &'a MagicComment>,
-        input: DecodedInput,
+        tokens: bumpalo::collections::Vec<'a, Token<'a>>,
+        diagnostics: bumpalo::collections::Vec<'a, Diagnostic<'a>>,
+        comments: bumpalo::collections::Vec<'a, Comment>,
+        magic_comments: bumpalo::collections::Vec<'a, MagicComment>,
+        input: DecodedInput<'a>,
     ) -> Self {
         Self {
             ast,
@@ -63,19 +63,19 @@ impl<'a> ParserResult<'a> {
         &self.ast
     }
     /// Returns `tokens` attribute
-    pub fn tokens(&self) -> &bumpalo::collections::Vec<'a, &'a Token<'a>> {
+    pub fn tokens(&self) -> &bumpalo::collections::Vec<'a, Token<'a>> {
         &self.tokens
     }
     /// Returns `diagnostics` attribute
-    pub fn diagnostics(&self) -> &bumpalo::collections::Vec<'a, &'a Diagnostic> {
+    pub fn diagnostics(&self) -> &bumpalo::collections::Vec<'a, Diagnostic<'a>> {
         &self.diagnostics
     }
     /// Returns `comments` attribute
-    pub fn comments(&self) -> &bumpalo::collections::Vec<'a, &'a Comment> {
+    pub fn comments(&self) -> &bumpalo::collections::Vec<'a, Comment> {
         &self.comments
     }
     /// Returns `magic_comments` attribute
-    pub fn magic_comments(&self) -> &bumpalo::collections::Vec<'a, &'a MagicComment> {
+    pub fn magic_comments(&self) -> &bumpalo::collections::Vec<'a, MagicComment> {
         &self.magic_comments
     }
     /// Returns `input` attribute
