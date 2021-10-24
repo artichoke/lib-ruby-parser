@@ -8,10 +8,10 @@ impl<'a> Lexer<'a> {
         if cfg!(feature = "debug-lexer") {
             println!("set_yylval_id({})", id);
         }
-        self.lval = Some(Bytes::new(Vec::from_iter_in(
-            id.as_bytes().iter().cloned(),
+        self.lval = Some(Bytes::new(
             self.bump,
-        )));
+            Vec::from_iter_in(id.as_bytes().iter().cloned(), self.bump),
+        ));
     }
 
     pub(crate) fn set_yylval_literal(&mut self, value: &TokenBuf<'a>) {
@@ -28,10 +28,10 @@ impl<'a> Lexer<'a> {
         if cfg!(feature = "debug-lexer") {
             println!("set_yylval_num {:#?}", flags);
         }
-        self.lval = Some(Bytes::new(Vec::from_iter_in(
-            flags.into_bytes().into_iter(),
+        self.lval = Some(Bytes::new(
             self.bump,
-        )));
+            Vec::from_iter_in(flags.into_bytes().into_iter(), self.bump),
+        ));
     }
 
     pub(crate) fn set_yylval_str(&mut self, value: &'a TokenBuf) {

@@ -21,11 +21,11 @@ pub use loc::Loc;
 /// like `Comment`, `Input`, `Decoder`
 pub mod source;
 
-// #[allow(clippy::collapsible_if)]
-// #[allow(clippy::collapsible_else_if)]
-// mod lexer;
+#[allow(clippy::collapsible_if)]
+#[allow(clippy::collapsible_else_if)]
+mod lexer;
 
-// pub use lexer::Lexer;
+pub use lexer::Lexer;
 
 mod static_environment;
 pub use static_environment::StaticEnvironment;
