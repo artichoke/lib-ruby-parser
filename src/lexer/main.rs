@@ -140,7 +140,7 @@ impl<'a> Lexer<'a> {
     /// of tokens. It's used internally to test simple inputs.
     ///
     /// If you need to get tokens better use `ParserResult::tokens` field
-    pub fn tokenize_until_eof(&mut self) -> Vec<'a, &'a Token> {
+    pub fn tokenize_until_eof(&'a mut self) -> Vec<'a, &'a mut Token> {
         let mut tokens = Vec::new_in(self.bump);
 
         loop {
@@ -154,7 +154,7 @@ impl<'a> Lexer<'a> {
         tokens
     }
 
-    pub(crate) fn yylex(&mut self) -> &'a Token {
+    pub(crate) fn yylex(&'a mut self) -> &'a mut Token {
         let lex_state_before = self.lex_state;
         self.lval = None;
 
@@ -1171,7 +1171,7 @@ impl<'a> Lexer<'a> {
         term: u8,
         paren: Option<u8>,
         heredoc_end: Option<HeredocEnd<'a>>,
-    ) -> Option<&'a StrTerm> {
+    ) -> Option<&'a StrTerm<'a>> {
         Some(self.bump.alloc(StrTerm::new_literal(StringLiteral::new(
             0,
             func,

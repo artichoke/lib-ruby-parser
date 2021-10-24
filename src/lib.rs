@@ -38,9 +38,9 @@ pub use parser_options::ParserOptions;
 mod parser_result;
 pub use parser_result::ParserResult;
 
-// #[allow(clippy::module_inception)]
-// mod parser;
-// pub use parser::Parser;
+#[allow(clippy::module_inception)]
+mod parser;
+pub use parser::Parser;
 
 mod builder;
 pub(crate) use builder::Builder;
@@ -66,8 +66,8 @@ pub use lex_state::LexState;
 mod token_buf;
 pub(crate) use token_buf::TokenBuf;
 
-// mod reserved_words;
-// pub use reserved_words::{reserved_word, ReservedWord};
+mod reserved_words;
+pub use reserved_words::{reserved_word, ReservedWord};
 
 mod stack_state;
 pub(crate) use stack_state::StackState;

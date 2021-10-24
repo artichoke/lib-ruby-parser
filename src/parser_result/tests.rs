@@ -15,15 +15,15 @@ fn ast<'a>(bump: &'a bumpalo::Bump) -> Maybe<&'a Node<'a>> {
     Maybe::some(Node::new_retry(bump, Loc::new(1, 2)))
 }
 
-fn tokens<'a>(bump: &'a bumpalo::Bump) -> Vec<'a, Token<'a>> {
-    bump_vec![in bump; Token::new(
+fn tokens<'a>(bump: &'a bumpalo::Bump) -> Vec<'a, &'a mut Token<'a>> {
+    bump_vec![in bump; bump.alloc(Token::new(
         bump,
         280,
         Bytes::new(bump, bump_vec![in bump; 97, 98, 99]),
         Loc::new(3, 4),
         LexState { value: 1 },
         LexState { value: 2 },
-    )]
+    ))]
 }
 
 fn diagnostics<'a>(bump: &'a bumpalo::Bump) -> Vec<Diagnostic> {

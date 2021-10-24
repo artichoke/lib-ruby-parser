@@ -13,7 +13,7 @@ const ESCAPE_CONTROL: usize = 1;
 const ESCAPE_META: usize = 2;
 
 impl<'a> Lexer<'a> {
-    fn take_strterm(&mut self) -> StringLiteral {
+    fn take_strterm(&mut self) -> StringLiteral<'a> {
         match self.strterm.take().map(|v| *v) {
             Some(StrTerm::StringLiteral(s)) => s,
             _ => unreachable!("strterm must be string"),

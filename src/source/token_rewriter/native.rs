@@ -51,11 +51,11 @@ impl LexStateAction {
 }
 
 /// Output of the token rewriter
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct TokenRewriterResult<'a> {
     /// Rewritten token. Can be input token if no rewriting expected
-    pub rewritten_token: &'a Token<'a>,
+    pub rewritten_token: &'a mut Token<'a>,
 
     /// Action to be applied on a token (keep or drop)
     pub token_action: RewriteAction,
@@ -64,26 +64,27 @@ pub struct TokenRewriterResult<'a> {
     pub lex_state_action: LexStateAction,
 }
 
-impl<'a> TokenRewriterResult<'a> {
-    pub(crate) fn into_internal(
-        &'a self,
-        bump: &'a bumpalo::Bump,
-    ) -> &'a InternalTokenRewriterResult<'a> {
-        let Self {
-            rewritten_token,
-            token_action,
-            lex_state_action,
-        } = self;
-        bump.alloc(InternalTokenRewriterResult {
-            rewritten_token,
-            token_action: token_action.clone(),
-            lex_state_action: lex_state_action.clone(),
-        })
-    }
-}
+// impl<'a> TokenRewriterResult<'a> {
+//     pub(crate) fn into_internal(
+//         &'a self,
+//         bump: &'a bumpalo::Bump,
+//     ) -> &'a InternalTokenRewriterResult<'a> {
+//         let Self {
+//             rewritten_token,
+//             token_action,
+//             lex_state_action,
+//         } = self;
+//         bump.alloc(InternalTokenRewriterResult {
+//             rewritten_token,
+//             token_action: token_action.clone(),
+//             lex_state_action: lex_state_action.clone(),
+//         })
+//     }
+// }
 
 /// Token rewriter function
-pub type TokenRewriterFn<'a> = dyn (Fn(&'a Token<'a>, &'a [u8]) -> TokenRewriterResult<'a>) + 'a;
+pub type TokenRewriterFn<'a> =
+    dyn (Fn(&'a mut Token<'a>, &'a [u8]) -> TokenRewriterResult<'a>) + 'a;
 
 /// Token rewriter struct, can be used to rewrite tokens on the fly
 pub struct TokenRewriter<'a> {
@@ -96,7 +97,11 @@ impl<'a> TokenRewriter<'a> {
         Self { f }
     }
 
-    pub(crate) fn call(&self, token: &'a Token<'a>, input: &'a [u8]) -> TokenRewriterResult<'a> {
+    pub(crate) fn call(
+        &self,
+        token: &'a mut Token<'a>,
+        input: &'a [u8],
+    ) -> TokenRewriterResult<'a> {
         let f = &*self.f;
         f(token, input)
     }

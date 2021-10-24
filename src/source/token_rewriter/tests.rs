@@ -14,7 +14,7 @@ use crate::Token;
 const INITIAL_TOKEN_ID: i32 = 310;
 const REWRITTEN_TOKEN_ID: i32 = 300;
 
-fn rewritten_token<'a>(bump: &'a Bump) -> &'a Token<'a> {
+fn rewritten_token<'a>(bump: &'a Bump) -> &'a mut Token<'a> {
     bump.alloc(Token::new(
         bump,
         REWRITTEN_TOKEN_ID,
@@ -131,7 +131,7 @@ fn test_keep() {
         dummy_rewriter::dummy_decoder_keep(),
         input.as_slice(),
     );
-    let result = result.into_internal(&bump);
+    // let result = result.into_internal(&bump);
 
     assert_eq!(result.rewritten_token.token_type(), INITIAL_TOKEN_ID);
     assert_eq!(
@@ -154,7 +154,7 @@ fn test_drop() {
         dummy_rewriter::dummy_decoder_drop(),
         input.as_slice(),
     );
-    let result = result.into_internal(&bump);
+    // let result = result.into_internal(&bump);
 
     assert!(result.token_action.is_drop());
 }
@@ -169,7 +169,7 @@ fn test_rewrite() {
         dummy_rewriter::dummy_decoder_rewrite(&bump),
         input.as_slice(),
     );
-    let result = result.into_internal(&bump);
+    // let result = result.into_internal(&bump);
 
     assert_eq!(result.rewritten_token.token_type(), REWRITTEN_TOKEN_ID);
     assert_eq!(

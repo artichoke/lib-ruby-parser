@@ -9,7 +9,7 @@ const NUM_SUFFIX_R: i8 = 1 << 0;
 const NUM_SUFFIX_I: i8 = 1 << 1;
 const NUM_SUFFIX_ALL: i8 = 3;
 
-impl Lexer<'_> {
+impl<'a> Lexer<'a> {
     pub(crate) fn parse_numeric(&mut self, prefix: u8) -> i32 {
         let mut c = MaybeByte::new(prefix);
 
@@ -364,7 +364,12 @@ impl Lexer<'_> {
         self.set_integer_literal(&mut tokenbuf, suffix)
     }
 
-    fn set_number_literal(&mut self, value: &mut TokenBuf, token_type: i32, suffix: i8) -> i32 {
+    fn set_number_literal(
+        &mut self,
+        value: &'a mut TokenBuf<'a>,
+        token_type: i32,
+        suffix: i8,
+    ) -> i32 {
         let mut token_type = token_type;
         if suffix & NUM_SUFFIX_I != 0 {
             value.push(b'i');
@@ -419,7 +424,7 @@ impl Lexer<'_> {
         result
     }
 
-    fn set_integer_literal(&mut self, value: &mut TokenBuf, suffix: i8) -> i32 {
+    fn set_integer_literal(&mut self, value: &'a mut TokenBuf<'a>, suffix: i8) -> i32 {
         let mut token_type = Self::tINTEGER;
         if suffix & NUM_SUFFIX_R != 0 {
             value.push(b'r');

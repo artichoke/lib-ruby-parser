@@ -14,6 +14,14 @@ pub(crate) mod rust {
                 .expect("expected at least 1 element")
         }
     }
+
+    impl<'a, T> ListAPI<T> for bumpalo::collections::Vec<'a, T> {
+        fn take_first(self) -> T {
+            self.into_iter()
+                .next()
+                .expect("expected at least 1 element")
+        }
+    }
 }
 
 #[cfg(feature = "compile-with-external-structures")]
@@ -875,7 +883,7 @@ pub(crate) mod external {
 }
 
 /// Shared List API, implemented for both ExternalList<T> and std::vec::Vec<T>
-pub trait ListAPI<T: Clone> {
+pub trait ListAPI<T> {
     /// Consumes `self` and returns the first element.
     /// Panics if list is empty
     fn take_first(self) -> T;

@@ -548,126 +548,110 @@ pub(crate) enum ParseValue<'a> {
 }
 
 impl<'a> ParseValue<'a> {
-    pub(crate) fn from_token(bump: &'a bumpalo::Bump, token: &'a mut Token<'a>) -> &'a Self {
-        bump.alloc(Self::Token(token))
+    pub(crate) fn from_token(token: &'a mut Token<'a>) -> Self {
+        Self::Token(token)
     }
 
-    pub(crate) fn new_superclass(bump: &'a bumpalo::Bump, value: Superclass<'a>) -> &'a Self {
-        bump.alloc(Self::Superclass(value))
+    pub(crate) fn new_superclass(value: Superclass<'a>) -> Self {
+        Self::Superclass(value)
     }
-    pub(crate) fn new_opt_ensure(bump: &'a bumpalo::Bump, value: Option<Ensure<'a>>) -> &'a Self {
-        bump.alloc(Self::OptEnsure(value))
+    pub(crate) fn new_opt_ensure(value: Option<Ensure<'a>>) -> Self {
+        Self::OptEnsure(value)
     }
-    pub(crate) fn new_opt_else(bump: &'a bumpalo::Bump, value: Option<Else<'a>>) -> &'a Self {
-        bump.alloc(Self::OptElse(value))
+    pub(crate) fn new_opt_else(value: Option<Else<'a>>) -> Self {
+        Self::OptElse(value)
     }
-    pub(crate) fn new_exc_var(bump: &'a bumpalo::Bump, value: ExcVar<'a>) -> &'a Self {
-        bump.alloc(Self::ExcVar(value))
+    pub(crate) fn new_exc_var(value: ExcVar<'a>) -> Self {
+        Self::ExcVar(value)
     }
-    pub(crate) fn new_if_tail(bump: &'a bumpalo::Bump, value: IfTail<'a>) -> &'a Self {
-        bump.alloc(Self::IfTail(value))
+    pub(crate) fn new_if_tail(value: IfTail<'a>) -> Self {
+        Self::IfTail(value)
     }
-    pub(crate) fn new_expr_value_do(bump: &'a bumpalo::Bump, value: ExprValueDo<'a>) -> &'a Self {
-        bump.alloc(Self::ExprValueDo(value))
+    pub(crate) fn new_expr_value_do(value: ExprValueDo<'a>) -> Self {
+        Self::ExprValueDo(value)
     }
-    pub(crate) fn new_p_kw_label(bump: &'a bumpalo::Bump, value: PKwLabel<'a>) -> &'a Self {
-        bump.alloc(Self::PKwLabel(value))
+    pub(crate) fn new_p_kw_label(value: PKwLabel<'a>) -> Self {
+        Self::PKwLabel(value)
     }
-    pub(crate) fn new_brace_body(bump: &'a bumpalo::Bump, value: BraceBody<'a>) -> &'a Self {
-        bump.alloc(Self::BraceBody(value))
+    pub(crate) fn new_brace_body(value: BraceBody<'a>) -> Self {
+        Self::BraceBody(value)
     }
-    pub(crate) fn new_cmd_brace_block(
-        bump: &'a bumpalo::Bump,
-        value: CmdBraceBlock<'a>,
-    ) -> &'a Self {
-        bump.alloc(Self::CmdBraceBlock(value))
+    pub(crate) fn new_cmd_brace_block(value: CmdBraceBlock<'a>) -> Self {
+        Self::CmdBraceBlock(value)
     }
-    pub(crate) fn new_paren_args(bump: &'a bumpalo::Bump, value: ParenArgs<'a>) -> &'a Self {
-        bump.alloc(Self::ParenArgs(value))
+    pub(crate) fn new_paren_args(value: ParenArgs<'a>) -> Self {
+        Self::ParenArgs(value)
     }
-    pub(crate) fn new_opt_paren_args(bump: &'a bumpalo::Bump, value: OptParenArgs<'a>) -> &'a Self {
-        bump.alloc(Self::OptParenArgs(value))
+    pub(crate) fn new_opt_paren_args(value: OptParenArgs<'a>) -> Self {
+        Self::OptParenArgs(value)
     }
-    pub(crate) fn new_lambda_body(bump: &'a bumpalo::Bump, value: LambdaBody<'a>) -> &'a Self {
-        bump.alloc(Self::LambdaBody(value))
+    pub(crate) fn new_lambda_body(value: LambdaBody<'a>) -> Self {
+        Self::LambdaBody(value)
     }
-    pub(crate) fn new_do_block(bump: &'a bumpalo::Bump, value: DoBlock<'a>) -> &'a Self {
-        bump.alloc(Self::DoBlock(value))
+    pub(crate) fn new_do_block(value: DoBlock<'a>) -> Self {
+        Self::DoBlock(value)
     }
-    pub(crate) fn new_brace_block(bump: &'a bumpalo::Bump, value: BraceBlock<'a>) -> &'a Self {
-        bump.alloc(Self::BraceBlock(value))
+    pub(crate) fn new_brace_block(value: BraceBlock<'a>) -> Self {
+        Self::BraceBlock(value)
     }
-    pub(crate) fn new_defs_head(bump: &'a bumpalo::Bump, value: DefsHead<'a>) -> &'a Self {
-        bump.alloc(Self::DefsHead(value))
+    pub(crate) fn new_defs_head(value: DefsHead<'a>) -> Self {
+        Self::DefsHead(value)
     }
-    pub(crate) fn new_defn_head(bump: &'a bumpalo::Bump, value: DefnHead<'a>) -> &'a Self {
-        bump.alloc(Self::DefnHead(value))
+    pub(crate) fn new_defn_head(value: DefnHead<'a>) -> Self {
+        Self::DefnHead(value)
     }
-    pub(crate) fn new_begin_block(bump: &'a bumpalo::Bump, value: BeginBlock<'a>) -> &'a Self {
-        bump.alloc(Self::BeginBlock(value))
+    pub(crate) fn new_begin_block(value: BeginBlock<'a>) -> Self {
+        Self::BeginBlock(value)
     }
-    pub(crate) fn new_cases(bump: &'a bumpalo::Bump, value: Cases<'a>) -> &'a Self {
-        bump.alloc(Self::Cases(value))
+    pub(crate) fn new_cases(value: Cases<'a>) -> Self {
+        Self::Cases(value)
     }
-    pub(crate) fn new_case_body(bump: &'a bumpalo::Bump, value: CaseBody<'a>) -> &'a Self {
-        bump.alloc(Self::CaseBody(value))
+    pub(crate) fn new_case_body(value: CaseBody<'a>) -> Self {
+        Self::CaseBody(value)
     }
-    pub(crate) fn new_p_cases(bump: &'a bumpalo::Bump, value: PCases<'a>) -> &'a Self {
-        bump.alloc(Self::PCases(value))
+    pub(crate) fn new_p_cases(value: PCases<'a>) -> Self {
+        Self::PCases(value)
     }
-    pub(crate) fn new_p_case_body(bump: &'a bumpalo::Bump, value: PCaseBody<'a>) -> &'a Self {
-        bump.alloc(Self::PCaseBody(value))
+    pub(crate) fn new_p_case_body(value: PCaseBody<'a>) -> Self {
+        Self::PCaseBody(value)
     }
-    pub(crate) fn new_do_body(bump: &'a bumpalo::Bump, value: DoBody<'a>) -> &'a Self {
-        bump.alloc(Self::DoBody(value))
+    pub(crate) fn new_do_body(value: DoBody<'a>) -> Self {
+        Self::DoBody(value)
     }
-    pub(crate) fn new_p_top_expr(bump: &'a bumpalo::Bump, value: PTopExpr<'a>) -> &'a Self {
-        bump.alloc(Self::PTopExpr(value))
+    pub(crate) fn new_p_top_expr(value: PTopExpr<'a>) -> Self {
+        Self::PTopExpr(value)
     }
     pub(crate) fn new_match_pattern_with_trailing_comma(
-        bump: &'a bumpalo::Bump,
         value: MatchPatternWithTrailingComma<'a>,
-    ) -> &'a Self {
-        bump.alloc(Self::MatchPatternWithTrailingComma(value))
+    ) -> Self {
+        Self::MatchPatternWithTrailingComma(value)
     }
-    pub(crate) fn new_none(bump: &'a bumpalo::Bump) -> &'a Self {
-        bump.alloc(Self::None)
+    pub(crate) fn new_none() -> Self {
+        Self::None
     }
-    pub(crate) fn new_node(bump: &'a bumpalo::Bump, node: &'a mut Node<'a>) -> &'a Self {
-        bump.alloc(Self::Node(node))
+    pub(crate) fn new_node(node: &'a mut Node<'a>) -> Self {
+        Self::Node(node)
     }
-    pub(crate) fn new_maybe_node(
-        bump: &'a bumpalo::Bump,
-        maybe_node: Option<&'a mut Node<'a>>,
-    ) -> &'a Self {
-        bump.alloc(Self::MaybeNode(maybe_node))
+    pub(crate) fn new_maybe_node(maybe_node: Option<&'a mut Node<'a>>) -> Self {
+        Self::MaybeNode(maybe_node)
     }
-    pub(crate) fn new_node_list(
-        bump: &'a bumpalo::Bump,
-        node_list: Vec<'a, &'a mut Node<'a>>,
-    ) -> &'a Self {
-        bump.alloc(Self::NodeList(node_list))
+    pub(crate) fn new_node_list(node_list: Vec<'a, &'a mut Node<'a>>) -> Self {
+        Self::NodeList(node_list)
     }
-    pub(crate) fn new_bool(bump: &'a bumpalo::Bump, value: bool) -> &'a Self {
-        bump.alloc(Self::Bool(value))
+    pub(crate) fn new_bool(value: bool) -> Self {
+        Self::Bool(value)
     }
-    pub(crate) fn new_num(bump: &'a bumpalo::Bump, value: i32) -> &'a Self {
-        bump.alloc(Self::Num(value))
+    pub(crate) fn new_num(value: i32) -> Self {
+        Self::Num(value)
     }
-    pub(crate) fn new_maybe_str_term(
-        bump: &'a bumpalo::Bump,
-        maybe_str_term: Option<&'a StrTerm<'a>>,
-    ) -> &'a Self {
-        bump.alloc(Self::MaybeStrTerm(maybe_str_term))
+    pub(crate) fn new_maybe_str_term(maybe_str_term: Option<&'a StrTerm<'a>>) -> Self {
+        Self::MaybeStrTerm(maybe_str_term)
     }
-    pub(crate) fn new_token(bump: &'a bumpalo::Bump, token: &'a mut Token<'a>) -> &'a Self {
-        bump.alloc(Self::Token(token))
+    pub(crate) fn new_token(token: &'a mut Token<'a>) -> Self {
+        Self::Token(token)
     }
-    pub(crate) fn new_token_list(
-        bump: &'a bumpalo::Bump,
-        token_list: Vec<'a, &'a mut Token<'a>>,
-    ) -> &'a Self {
-        bump.alloc(Self::TokenList(token_list))
+    pub(crate) fn new_token_list(token_list: Vec<'a, &'a mut Token<'a>>) -> Self {
+        Self::TokenList(token_list)
     }
 }
 

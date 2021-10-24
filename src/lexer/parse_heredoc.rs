@@ -10,7 +10,7 @@ crate::use_native_or_external!(String);
 
 const TAB_WIDTH: i32 = 8;
 
-impl Lexer<'_> {
+impl<'a> Lexer<'a> {
     pub(crate) fn heredoc_identifier(&mut self) -> Option<i32> {
         /*
          * term_len is length of `<<"END"` except `END`,
@@ -288,7 +288,7 @@ impl Lexer<'_> {
         Self::tSTRING_CONTENT
     }
 
-    fn compute_heredoc_end(&self) -> HeredocEnd {
+    fn compute_heredoc_end(&self) -> HeredocEnd<'a> {
         let start = self.buffer.pbeg;
         let mut end_starts_at = start;
         while self.buffer.byte_at(end_starts_at) == b' ' {
@@ -345,7 +345,7 @@ impl Lexer<'_> {
         Self::tSTRING_END
     }
 
-    fn heredoc_flush_str(&mut self, str_: &TokenBuf) -> i32 {
+    fn heredoc_flush_str(&mut self, str_: &'a TokenBuf<'a>) -> i32 {
         self.set_yylval_str(str_);
         self.flush_string_content();
         Self::tSTRING_CONTENT
