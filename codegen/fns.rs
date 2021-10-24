@@ -253,9 +253,9 @@ pub(crate) mod node_fields {
         use lib_ruby_parser_nodes::NodeFieldType::*;
 
         match node_with_field.field.field_type {
-            Node => "&'a mut Node<'a>",
-            Nodes => "Vec<'a, &'a mut Node<'a>>",
-            MaybeNode { .. } => "Maybe<&'a mut Node<'a>>",
+            Node => "&'a Node<'a>",
+            Nodes => "Vec<'a, &'a Node<'a>>",
+            MaybeNode { .. } => "Maybe<&'a Node<'a>>",
             Loc => "Loc",
             MaybeLoc => "Option<Loc>",
             Str { .. } => "String<'a>",

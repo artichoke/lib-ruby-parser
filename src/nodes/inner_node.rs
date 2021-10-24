@@ -68,13 +68,13 @@ impl InspectVec {
             .push(format!(",\n{}", node.inspect(self.indent + 1)))
     }
 
-    pub(crate) fn push_maybe_node<'a>(&mut self, node: &'a Maybe<&'a mut Node<'a>>) {
+    pub(crate) fn push_maybe_node<'a>(&mut self, node: &'a Maybe<&'a Node<'a>>) {
         if let Some(node) = node.as_ref() {
             self.push_node(node)
         }
     }
 
-    pub(crate) fn push_regex_options<'a>(&mut self, node: &'a Maybe<&'a mut Node<'a>>) {
+    pub(crate) fn push_regex_options<'a>(&mut self, node: &'a Maybe<&'a Node<'a>>) {
         if let Some(node) = node.as_ref() {
             self.push_node(node)
         } else {
@@ -86,7 +86,7 @@ impl InspectVec {
         }
     }
 
-    pub(crate) fn push_maybe_node_or_nil<'a>(&mut self, node: &'a Maybe<&'a mut Node<'a>>) {
+    pub(crate) fn push_maybe_node_or_nil<'a>(&mut self, node: &'a Maybe<&'a Node<'a>>) {
         if let Some(node) = node.as_ref() {
             self.push_node(node)
         } else {
@@ -94,10 +94,7 @@ impl InspectVec {
         }
     }
 
-    pub(crate) fn push_nodes<'a>(
-        &mut self,
-        nodes: &'a bumpalo::collections::Vec<&'a mut Node<'a>>,
-    ) {
+    pub(crate) fn push_nodes<'a>(&mut self, nodes: &'a bumpalo::collections::Vec<&'a Node<'a>>) {
         for node in nodes.iter() {
             self.push_node(node)
         }

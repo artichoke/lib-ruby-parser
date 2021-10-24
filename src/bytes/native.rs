@@ -63,10 +63,12 @@ impl<'a> Bytes<'a> {
         self.raw.push(item);
     }
 
-    pub(crate) fn take(&mut self) -> Self {
+    #[allow(mutable_transmutes)]
+    pub(crate) fn take(&self) -> Self {
+        let mut_self: &mut Self = unsafe { std::mem::transmute(self) };
         Self {
-            raw: self.raw.split_off(0),
-            bump: self.bump,
+            raw: mut_self.raw.split_off(0),
+            bump: mut_self.bump,
         }
     }
 }

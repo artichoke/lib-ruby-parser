@@ -43,7 +43,7 @@
     max_numparam_stack: MaxNumparamStack,
     pattern_variables: VariablesStack,
     pattern_hash_keys: VariablesStack,
-    tokens: Vec<'a /*'*/, &'a /*''*/ mut Token<'a /*'*/>>,
+    tokens: Vec<'a /*'*/, &'a /*''*/ Token<'a /*'*/>>,
     diagnostics: Diagnostics<'a /*'*/>,
     token_rewriter: Maybe<TokenRewriter<'a /*'*/>>,
     record_tokens: bool,
@@ -648,7 +648,7 @@ use crate::parser_options::InternalParserOptions;
                     }
                 | mlhs tEQL command_call
                     {
-                        let command_call = $<BoxedNode>3;
+                        let mut command_call = $<BoxedNode>3;
                         command_call = self.value_expr(command_call)?;
 
                         $$ = Value::new_node(
@@ -1313,7 +1313,10 @@ use crate::parser_options::InternalParserOptions;
                     {
                         let mlhs_inner = $<Node>2;
                         let mlhs_items = match mlhs_inner {
-                            Node::Mlhs(mlhs) => mlhs.items,
+                            Node::Mlhs(mlhs) => {
+                                let items: &mut Vec<'a /*'*/, &'a /*'*/ Node<'a /*'*/>> = unsafe { std::mem::transmute(&mlhs.items) };
+                                items.split_off(0)
+                            },
                             _ => unreachable!("unsupported mlhs item {:?}", mlhs_inner)
                         };
 
@@ -6961,16 +6964,16 @@ impl<'a /*'*/> Parser<'a /*'*/> {
         self.diagnostics.emit(diagnostic);
     }
 
-    fn yylex(&'a mut self) -> &'a /*'*/ mut Token<'a /*'*/> {
+    fn yylex(&mut self) -> &'a /*'*/ Token<'a /*'*/> {
         self.yylexer.yylex()
     }
 
-    fn next_token(&'a mut self) -> &'a /*'*/ mut Token<'a /*'*/> {
+    fn next_token(&mut self) -> &'a /*'*/ Token<'a /*'*/> {
         let mut token = self.yylex();
 
         if let Some(token_rewriter) = self.token_rewriter.as_ref() {
             let TokenRewriterResult { rewritten_token, token_action, lex_state_action } =
-                token_rewriter.call(token, self.yylexer.buffer.input.as_shared_bytes());
+                token_rewriter.call(token, self.yylexer.buffer.input.decoded.bytes.as_slice());
 
             if lex_state_action.is_keep() {
                 // keep
@@ -7064,7 +7067,7 @@ impl<'a /*'*/> Parser<'a /*'*/> {
         }
     }
 
-    fn value_expr(&self, node: &'a /*'*/ mut Node<'a /*'*/>) -> Result<&'a /*'*/ mut Node<'a /*'*/>, ()> {
+    fn value_expr(&self, node: &'a /*'*/ Node<'a /*'*/>) -> Result<&'a /*'*/ Node<'a /*'*/>, ()> {
         self.builder.value_expr(node)
     }
 

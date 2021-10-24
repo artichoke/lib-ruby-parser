@@ -43,7 +43,7 @@ impl<'a> Node<'a> {
     // new_<node> FNs
 {{ each node }}<dnl>
     /// Constructs `Node::{{ helper node-rust-camelcase-name }}` variant
-    pub(crate) fn new_{{ helper node-lower-name }}(bump: &'a bumpalo::Bump, {{ each node-field }}{{ helper node-field-rust-field-name }}: {{ helper node-field-rust-field-type }}, {{ end }}) -> &'a mut Self {
+    pub(crate) fn new_{{ helper node-lower-name }}(bump: &'a bumpalo::Bump, {{ each node-field }}{{ helper node-field-rust-field-name }}: {{ helper node-field-rust-field-type }}, {{ end }}) -> &'a Self {
         bump.alloc(
             Self::{{ helper node-rust-camelcase-name }}({{ helper node-rust-camelcase-name }} { {{ each node-field }}{{ helper node-field-rust-field-name }}, {{ end }} })
         )
@@ -62,18 +62,6 @@ impl<'a> Node<'a> {
 {{ each node }}<dnl>
     /// Casts `&Node` to `Option<&nodes::{{ helper node-rust-camelcase-name }}>`
     pub fn as_{{ helper node-lower-name }}(&'a self) -> Option<&'a {{ helper node-rust-camelcase-name }}> {
-        if let Self::{{ helper node-rust-camelcase-name }}(inner) = self {
-            Some(inner)
-        } else {
-            None
-        }
-    }
-{{ end }}<dnl>
-
-    // as_<node>_mut FNs
-{{ each node }}<dnl>
-    /// Casts `&Node` to `Option<&mut nodes::{{ helper node-rust-camelcase-name }}>`
-    pub fn as_{{ helper node-lower-name }}_mut(&'a mut self) -> Option<&'a mut {{ helper node-rust-camelcase-name }}> {
         if let Self::{{ helper node-rust-camelcase-name }}(inner) = self {
             Some(inner)
         } else {

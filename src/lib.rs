@@ -39,9 +39,11 @@ mod parser_result;
 pub use parser_result::ParserResult;
 
 #[allow(clippy::module_inception)]
+#[allow(mutable_transmutes)]
 mod parser;
 pub use parser::Parser;
 
+#[allow(mutable_transmutes)]
 mod builder;
 pub(crate) use builder::Builder;
 

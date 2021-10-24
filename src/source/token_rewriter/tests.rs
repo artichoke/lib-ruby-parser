@@ -14,7 +14,7 @@ use crate::Token;
 const INITIAL_TOKEN_ID: i32 = 310;
 const REWRITTEN_TOKEN_ID: i32 = 300;
 
-fn rewritten_token<'a>(bump: &'a Bump) -> &'a mut Token<'a> {
+fn rewritten_token<'a>(bump: &'a Bump) -> &'a Token<'a> {
     bump.alloc(Token::new(
         bump,
         REWRITTEN_TOKEN_ID,

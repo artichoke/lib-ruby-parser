@@ -99,14 +99,14 @@ impl<'a> Lexer<'a> {
 
         self.buffer.goto_eol();
 
-        self.strterm = Some(self.bump.alloc(StrTerm::new_heredoc(HeredocLiteral::new(
+        self.strterm = Some(StrTerm::new_heredoc(HeredocLiteral::new(
             self.buffer.lastline,
             offset,
             self.buffer.ruby_sourceline,
             len,
             quote,
             func,
-        ))));
+        )));
 
         self.token_flush();
         self.buffer.heredoc_indent = indent;
@@ -345,7 +345,7 @@ impl<'a> Lexer<'a> {
         Self::tSTRING_END
     }
 
-    fn heredoc_flush_str(&mut self, str_: &'a TokenBuf<'a>) -> i32 {
+    fn heredoc_flush_str(&mut self, str_: &TokenBuf<'a>) -> i32 {
         self.set_yylval_str(str_);
         self.flush_string_content();
         Self::tSTRING_CONTENT

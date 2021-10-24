@@ -54,19 +54,13 @@ pub(crate) enum LogicalOp {
 
 #[derive(Debug)]
 pub(crate) enum PKwLabel<'a> {
-    PlainLabel(&'a mut Token<'a>),
-    QuotedLabel(
-        (
-            &'a mut Token<'a>,
-            Vec<'a, &'a mut Node<'a>>,
-            &'a mut Token<'a>,
-        ),
-    ),
+    PlainLabel(&'a Token<'a>),
+    QuotedLabel((&'a Token<'a>, Vec<'a, &'a Node<'a>>, &'a Token<'a>)),
 }
 
 #[derive(Debug)]
 pub(crate) enum ArgsType<'a> {
-    Args(Maybe<&'a mut Node<'a>>),
+    Args(Maybe<&'a Node<'a>>),
     Numargs(u8),
 }
 
@@ -82,6 +76,7 @@ pub(crate) struct Builder<'a> {
     diagnostics: Diagnostics<'a>,
 }
 
+#[allow(mutable_transmutes)]
 impl<'a> Builder<'a> {
     pub(crate) fn new(
         bump: &'a Bump,
@@ -111,48 +106,45 @@ impl<'a> Builder<'a> {
 
     // Singletons
 
-    pub(crate) fn nil(&self, nil_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn nil(&self, nil_t: &'a Token<'a>) -> &'a Node<'a> {
         Node::new_nil(self.bump, loc(nil_t))
     }
 
-    pub(crate) fn true_(&self, true_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn true_(&self, true_t: &'a Token<'a>) -> &'a Node<'a> {
         Node::new_true(self.bump, loc(true_t))
     }
 
-    pub(crate) fn false_(&self, false_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn false_(&self, false_t: &'a Token<'a>) -> &'a Node<'a> {
         Node::new_false(self.bump, loc(false_t))
     }
 
     // Numerics
 
-    pub(crate) fn integer(&self, integer_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn integer(&self, integer_t: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(integer_t);
         Node::new_int(self.bump, value(integer_t), None, expression_l)
     }
 
-    pub(crate) fn float(&self, float_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn float(&self, float_t: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(float_t);
         Node::new_float(self.bump, value(float_t), None, expression_l)
     }
 
-    pub(crate) fn rational(&self, rational_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn rational(&self, rational_t: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(rational_t);
         Node::new_rational(self.bump, value(rational_t), None, expression_l)
     }
 
-    pub(crate) fn complex(&self, complex_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn complex(&self, complex_t: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(complex_t);
         Node::new_complex(self.bump, value(complex_t), None, expression_l)
     }
 
-    pub(crate) fn unary_num(
-        &self,
-        unary_t: &'a mut Token<'a>,
-        numeric: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+    pub(crate) fn unary_num(&self, unary_t: &'a Token<'a>, numeric: &'a Node<'a>) -> &'a Node<'a> {
         let new_operator_l = loc(unary_t);
         let sign = String::from(value(unary_t));
 
+        let numeric: &'a mut Node<'a> = unsafe { std::mem::transmute(numeric) };
         match numeric {
             Node::Int(int) => {
                 let new_value = String::from_str_in(&(sign + int.get_value()), self.bump);
@@ -198,7 +190,7 @@ impl<'a> Builder<'a> {
         numeric
     }
 
-    pub(crate) fn __line__(&self, line_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn __line__(&self, line_t: &'a Token<'a>) -> &'a Node<'a> {
         Node::new_line(self.bump, loc(line_t))
     }
 
@@ -206,11 +198,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn str_node(
         &self,
-        begin_t: Maybe<&'a mut Token<'a>>,
+        begin_t: Maybe<&'a Token<'a>>,
         value: Bytes<'a>,
-        parts: Vec<'a, &'a mut Node<'a>>,
-        end_t: Maybe<&'a mut Token<'a>>,
-    ) -> &'a mut Node<'a> {
+        parts: Vec<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token<'a>>,
+    ) -> &'a Node<'a> {
         if self.is_heredoc(&begin_t) {
             let HeredocMap {
                 heredoc_body_l,
@@ -236,7 +228,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub(crate) fn string_internal(&self, string_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn string_internal(&self, string_t: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(string_t);
         let value = string_t.token_value.take();
         Node::new_str(self.bump, value, None, None, expression_l)
@@ -244,10 +236,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn string_compose(
         &self,
-        begin_t: Maybe<&'a mut Token<'a>>,
-        parts: Vec<'a, &'a mut Node<'a>>,
-        end_t: Maybe<&'a mut Token<'a>>,
-    ) -> &'a mut Node<'a> {
+        begin_t: Maybe<&'a Token<'a>>,
+        parts: Vec<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token<'a>>,
+    ) -> &'a Node<'a> {
         if parts.is_empty() {
             return self.str_node(begin_t, Bytes::empty(self.bump), parts, end_t);
         } else if parts.len() == 1 {
@@ -308,7 +300,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub(crate) fn character(&self, char_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn character(&self, char_t: &'a Token<'a>) -> &'a Node<'a> {
         let str_loc = loc(char_t);
 
         let begin_l = Some(str_loc.with_end(str_loc.begin() + 1));
@@ -319,7 +311,7 @@ impl<'a> Builder<'a> {
         Node::new_str(self.bump, value, begin_l, end_l, expression_l)
     }
 
-    pub(crate) fn __file__(&self, file_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn __file__(&self, file_t: &'a Token<'a>) -> &'a Node<'a> {
         Node::new_file(self.bump, loc(file_t))
     }
 
@@ -334,11 +326,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub(crate) fn symbol(
-        &self,
-        start_t: &'a mut Token<'a>,
-        value_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+    pub(crate) fn symbol(&self, start_t: &'a Token<'a>, value_t: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(start_t).join(&loc(value_t));
         let begin_l = Some(loc(start_t));
         let value = value_t.token_value.take();
@@ -346,7 +334,7 @@ impl<'a> Builder<'a> {
         Node::new_sym(self.bump, value, begin_l, None, expression_l)
     }
 
-    pub(crate) fn symbol_internal(&self, symbol_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn symbol_internal(&self, symbol_t: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(symbol_t);
         let value = symbol_t.token_value.take();
         self.validate_sym_value(&value, &expression_l);
@@ -355,10 +343,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn symbol_compose(
         &self,
-        begin_t: &'a mut Token<'a>,
-        mut parts: Vec<'a, &'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        begin_t: &'a Token<'a>,
+        mut parts: Vec<'a, &'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         if parts.len() == 1 {
             match parts.first_mut().unwrap() {
                 Node::Str(str) => {
@@ -390,10 +378,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn xstring_compose(
         &self,
-        begin_t: &'a mut Token<'a>,
-        parts: Vec<'a, &'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        begin_t: &'a Token<'a>,
+        parts: Vec<'a, &'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let begin_l = loc(begin_t);
         if lossy_value(begin_t).as_str().starts_with("<<") {
             let heredoc_body_l = collection_expr(&parts).unwrap_or_else(|| loc(end_t));
@@ -417,7 +405,7 @@ impl<'a> Builder<'a> {
 
     // Indented (interpolated, noninterpolated, executable) strings
 
-    pub(crate) fn heredoc_dedent(&self, node: &'a mut Node<'a>, dedent_level: i32) {
+    pub(crate) fn heredoc_dedent(&self, node: &'a Node<'a>, dedent_level: i32) {
         if dedent_level == 0 {
             return;
         }
@@ -459,7 +447,7 @@ impl<'a> Builder<'a> {
 
         fn dedent_heredoc_parts<'a>(
             bump: &'a Bump,
-            parts: &mut Vec<'a, &'a mut Node<'a>>,
+            parts: &mut Vec<'a, &'a Node<'a>>,
             dedent_level: usize,
         ) {
             let mut idx_to_drop = bump_vec![in bump;];
@@ -505,6 +493,7 @@ impl<'a> Builder<'a> {
 
         match node {
             Node::Heredoc(Heredoc { parts, .. }) | Node::XHeredoc(XHeredoc { parts, .. }) => {
+                let parts: &mut Vec<&'a Node> = unsafe { std::mem::transmute(parts) };
                 dedent_heredoc_parts(self.bump, parts, dedent_level);
             }
             _ => {
@@ -515,10 +504,7 @@ impl<'a> Builder<'a> {
 
     // Regular expressions
 
-    pub(crate) fn regexp_options(
-        &self,
-        regexp_end_t: &'a mut Token<'a>,
-    ) -> Maybe<&'a mut Node<'a>> {
+    pub(crate) fn regexp_options(&self, regexp_end_t: &'a Token<'a>) -> Maybe<&'a Node<'a>> {
         if regexp_end_t.loc().end() - regexp_end_t.loc().begin() == 1 {
             // no regexp options, only trailing "/"
             return Maybe::none();
@@ -543,11 +529,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn regexp_compose(
         &self,
-        begin_t: &'a mut Token<'a>,
-        parts: Vec<'a, &'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-        options: Maybe<&'a mut Node<'a>>,
-    ) -> &'a mut Node<'a> {
+        begin_t: &'a Token<'a>,
+        parts: Vec<'a, &'a Node<'a>>,
+        end_t: &'a Token<'a>,
+        options: Maybe<&'a Node<'a>>,
+    ) -> &'a Node<'a> {
         let begin_l = loc(begin_t);
         let end_l = loc(end_t).resize(1);
         let expression_l =
@@ -581,10 +567,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn array(
         &self,
-        begin_t: Maybe<&'a mut Token<'a>>,
-        elements: Vec<'a, &'a mut Node<'a>>,
-        end_t: Maybe<&'a mut Token<'a>>,
-    ) -> &'a mut Node<'a> {
+        begin_t: Maybe<&'a Token<'a>>,
+        elements: Vec<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token<'a>>,
+    ) -> &'a Node<'a> {
         let CollectionMap {
             begin_l,
             end_l,
@@ -594,18 +580,14 @@ impl<'a> Builder<'a> {
         Node::new_array(self.bump, elements, begin_l, end_l, expression_l)
     }
 
-    pub(crate) fn splat(
-        &self,
-        star_t: &'a mut Token<'a>,
-        value: Maybe<&'a mut Node<'a>>,
-    ) -> &'a mut Node<'a> {
+    pub(crate) fn splat(&self, star_t: &'a Token<'a>, value: Maybe<&'a Node<'a>>) -> &'a Node<'a> {
         let operator_l = loc(star_t);
         let expression_l = operator_l.maybe_join(&maybe_node_expr_mut(&value));
 
         Node::new_splat(self.bump, value, operator_l, expression_l)
     }
 
-    pub(crate) fn word(&self, parts: Vec<'a, &'a mut Node<'a>>) -> &'a mut Node<'a> {
+    pub(crate) fn word(&self, parts: Vec<'a, &'a Node<'a>>) -> &'a Node<'a> {
         if parts.len() == 1 && (parts[0].is_str() || parts[0].is_dstr()) {
             let part = parts
                 .into_iter()
@@ -625,10 +607,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn words_compose(
         &self,
-        begin_t: &'a mut Token<'a>,
-        elements: Vec<'a, &'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        begin_t: &'a Token<'a>,
+        elements: Vec<'a, &'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let begin_l = loc(begin_t);
         let end_l = loc(end_t);
         let expression_l = begin_l.join(&end_l);
@@ -643,10 +625,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn symbols_compose(
         &self,
-        begin_t: &'a mut Token<'a>,
-        parts: Vec<'a, &'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        begin_t: &'a Token<'a>,
+        parts: Vec<'a, &'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let parts = parts.into_iter().map(|part| match part {
             Node::Str(Str {
                 value,
@@ -670,7 +652,7 @@ impl<'a> Builder<'a> {
                 expression_l,
             }) => Node::new_dsym(
                 self.bump,
-                parts.split_off(0),
+                take_vec(parts),
                 begin_l.clone(),
                 end_l.clone(),
                 expression_l.clone(),
@@ -695,21 +677,17 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn pair(
         &self,
-        key: &'a mut Node<'a>,
-        assoc_t: &'a mut Token<'a>,
-        value: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        key: &'a Node<'a>,
+        assoc_t: &'a Token<'a>,
+        value: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let operator_l = loc(assoc_t);
         let expression_l = join_exprs(key, value);
 
         Node::new_pair(self.bump, key, value, operator_l, expression_l)
     }
 
-    pub(crate) fn pair_keyword(
-        &self,
-        key_t: &'a mut Token<'a>,
-        value: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+    pub(crate) fn pair_keyword(&self, key_t: &'a Token<'a>, value: &'a Node<'a>) -> &'a Node<'a> {
         let key_loc = loc(key_t);
         let key_l = key_loc.adjust_end(-1);
         let colon_l = key_loc.with_begin(key_loc.end() - 1);
@@ -729,11 +707,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn pair_quoted(
         &self,
-        begin_t: &'a mut Token<'a>,
-        parts: Vec<'a, &'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-        value: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        begin_t: &'a Token<'a>,
+        parts: Vec<'a, &'a Node<'a>>,
+        end_t: &'a Token<'a>,
+        value: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let end_l = loc(end_t);
 
         let quote_loc = Loc::new(end_l.end() - 2, end_l.end() - 1);
@@ -741,7 +719,7 @@ impl<'a> Builder<'a> {
         let colon_l = end_l.with_begin(end_l.end() - 1);
 
         let end_t = end_t;
-        let end_t: &'a mut Token = self.bump.alloc(Token::new(
+        let end_t: &'a Token = self.bump.alloc(Token::new(
             self.bump,
             end_t.token_type(),
             end_t.token_value.take(),
@@ -760,11 +738,7 @@ impl<'a> Builder<'a> {
         )
     }
 
-    pub(crate) fn kwsplat(
-        &self,
-        dstar_t: &'a mut Token<'a>,
-        value: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+    pub(crate) fn kwsplat(&self, dstar_t: &'a Token<'a>, value: &'a Node<'a>) -> &'a Node<'a> {
         let operator_l = loc(dstar_t);
         let expression_l = value.expression().join(&operator_l);
 
@@ -773,10 +747,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn associate(
         &self,
-        begin_t: Maybe<&'a mut Token<'a>>,
-        pairs: Vec<'a, &'a mut Node<'a>>,
-        end_t: Maybe<&'a mut Token<'a>>,
-    ) -> &'a mut Node<'a> {
+        begin_t: Maybe<&'a Token<'a>>,
+        pairs: Vec<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token<'a>>,
+    ) -> &'a Node<'a> {
         let CollectionMap {
             begin_l,
             end_l,
@@ -790,10 +764,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn range_inclusive(
         &self,
-        left: Maybe<&'a mut Node<'a>>,
-        dot2_t: &'a mut Token<'a>,
-        right: Maybe<&'a mut Node<'a>>,
-    ) -> &'a mut Node<'a> {
+        left: Maybe<&'a Node<'a>>,
+        dot2_t: &'a Token<'a>,
+        right: Maybe<&'a Node<'a>>,
+    ) -> &'a Node<'a> {
         let operator_l = loc(dot2_t);
         let expression_l = operator_l
             .maybe_join(&maybe_node_expr_mut(&left))
@@ -804,10 +778,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn range_exclusive(
         &self,
-        left: Maybe<&'a mut Node<'a>>,
-        dot3_t: &'a mut Token<'a>,
-        right: Maybe<&'a mut Node<'a>>,
-    ) -> &'a mut Node<'a> {
+        left: Maybe<&'a Node<'a>>,
+        dot3_t: &'a Token<'a>,
+        right: Maybe<&'a Node<'a>>,
+    ) -> &'a Node<'a> {
         let operator_l = loc(dot3_t);
         let expression_l = operator_l
             .maybe_join(&maybe_node_expr_mut(&left))
@@ -820,38 +794,38 @@ impl<'a> Builder<'a> {
     // Access
     //
 
-    pub(crate) fn self_(&self, token: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn self_(&self, token: &'a Token<'a>) -> &'a Node<'a> {
         Node::new_self(self.bump, loc(token))
     }
 
-    pub(crate) fn lvar(&self, token: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn lvar(&self, token: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(token);
         Node::new_lvar(self.bump, value(token), expression_l)
     }
 
-    pub(crate) fn ivar(&self, token: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn ivar(&self, token: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(token);
         Node::new_ivar(self.bump, value(token), expression_l)
     }
 
-    pub(crate) fn gvar(&self, token: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn gvar(&self, token: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(token);
         Node::new_gvar(self.bump, value(token), expression_l)
     }
 
-    pub(crate) fn cvar(&self, token: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn cvar(&self, token: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(token);
         Node::new_cvar(self.bump, value(token), expression_l)
     }
 
-    pub(crate) fn back_ref(&self, token: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn back_ref(&self, token: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(token);
         Node::new_back_ref(self.bump, value(token), expression_l)
     }
 
     const MAX_NTH_REF: usize = 0b111111111111111111111111111111;
 
-    pub(crate) fn nth_ref(&self, token: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn nth_ref(&self, token: &'a Token<'a>) -> &'a Node<'a> {
         let expression_l = loc(token);
         let name = value(token);
         let name = &name.as_str()[1..];
@@ -867,7 +841,7 @@ impl<'a> Builder<'a> {
 
         Node::new_nth_ref(self.bump, name, expression_l)
     }
-    pub(crate) fn accessible(&self, node: &'a mut Node<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn accessible(&self, node: &'a Node<'a>) -> &'a Node<'a> {
         match node {
             Node::Lvar(Lvar { name, expression_l }) => {
                 let name_s = name.as_str();
@@ -881,12 +855,12 @@ impl<'a> Builder<'a> {
                         }
                     }
 
-                    Node::new_lvar(self.bump, name.split_off(0), expression_l.clone())
+                    Node::new_lvar(self.bump, take_str(name), expression_l.clone())
                 } else {
                     Node::new_send(
                         self.bump,
                         Maybe::none(),
-                        name.split_off(0),
+                        take_str(name),
                         bump_vec![in self.bump; ],
                         None,
                         Some(expression_l.clone()),
@@ -901,7 +875,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub(crate) fn const_(&self, name_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn const_(&self, name_t: &'a Token<'a>) -> &'a Node<'a> {
         let name_l = loc(name_t);
         let expression_l = name_l;
 
@@ -917,9 +891,9 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn const_global(
         &self,
-        t_colon3: &'a mut Token<'a>,
-        name_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        t_colon3: &'a Token<'a>,
+        name_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let scope = Node::new_cbase(self.bump, loc(t_colon3));
 
         let name_l = loc(name_t);
@@ -938,11 +912,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn const_fetch(
         &self,
-        scope: &'a mut Node<'a>,
-        t_colon2: &'a mut Token<'a>,
-        name_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
-        let scope: &'a mut Node = scope;
+        scope: &'a Node<'a>,
+        t_colon2: &'a Token<'a>,
+        name_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
+        let scope: &'a Node = scope;
         let name_l = loc(name_t);
         let expression_l = scope.expression().join(&name_l);
         let double_colon_l = loc(t_colon2);
@@ -957,7 +931,7 @@ impl<'a> Builder<'a> {
         )
     }
 
-    pub(crate) fn __encoding__(&self, encoding_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn __encoding__(&self, encoding_t: &'a Token<'a>) -> &'a Node<'a> {
         Node::new_encoding(self.bump, loc(encoding_t))
     }
 
@@ -965,11 +939,11 @@ impl<'a> Builder<'a> {
     // Assignments
     //
 
-    pub(crate) fn assignable(&self, node: &'a mut Node<'a>) -> Result<&'a mut Node<'a>, ()> {
+    pub(crate) fn assignable(&self, node: &'a Node<'a>) -> Result<&'a Node<'a>, ()> {
         let node = match node {
             Node::Cvar(Cvar { name, expression_l }) => Node::new_cvasgn(
                 self.bump,
-                name.split_off(0),
+                take_str(name),
                 Maybe::none(),
                 expression_l.clone(),
                 None,
@@ -977,7 +951,7 @@ impl<'a> Builder<'a> {
             ),
             Node::Ivar(Ivar { name, expression_l }) => Node::new_ivasgn(
                 self.bump,
-                name.split_off(0),
+                take_str(name),
                 Maybe::none(),
                 expression_l.clone(),
                 None,
@@ -985,7 +959,7 @@ impl<'a> Builder<'a> {
             ),
             Node::Gvar(Gvar { name, expression_l }) => Node::new_gvasgn(
                 self.bump,
-                name.split_off(0),
+                take_str(name),
                 Maybe::none(),
                 expression_l.clone(),
                 None,
@@ -1007,8 +981,8 @@ impl<'a> Builder<'a> {
                 }
                 Node::new_casgn(
                     self.bump,
-                    scope.take(),
-                    name.split_off(0),
+                    take_maybe_node(scope),
+                    take_str(name),
                     Maybe::none(),
                     double_colon_l.clone(),
                     name_l.clone(),
@@ -1025,7 +999,7 @@ impl<'a> Builder<'a> {
 
                 Node::new_lvasgn(
                     self.bump,
-                    name.split_off(0),
+                    take_str(name),
                     Maybe::none(),
                     expression_l.clone(),
                     None,
@@ -1065,7 +1039,7 @@ impl<'a> Builder<'a> {
             }
             Node::BackRef(BackRef { name, expression_l }) => {
                 self.error(
-                    DiagnosticMessage::new_cant_set_variable(name.split_off(0)),
+                    DiagnosticMessage::new_cant_set_variable(take_str(name)),
                     expression_l,
                 );
                 return Err(());
@@ -1088,7 +1062,7 @@ impl<'a> Builder<'a> {
         Ok(node)
     }
 
-    pub(crate) fn const_op_assignable(&self, node: &'a mut Node<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn const_op_assignable(&self, node: &'a Node<'a>) -> &'a Node<'a> {
         match node {
             Node::Const(Const {
                 scope,
@@ -1098,8 +1072,8 @@ impl<'a> Builder<'a> {
                 expression_l,
             }) => Node::new_casgn(
                 self.bump,
-                scope.take(),
-                name.split_off(0),
+                take_maybe_node(scope),
+                take_str(name),
                 Maybe::none(),
                 double_colon_l.clone(),
                 name_l.clone(),
@@ -1114,13 +1088,14 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn assign(
         &self,
-        lhs: &'a mut Node<'a>,
-        eql_t: &'a mut Token<'a>,
-        new_rhs: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        lhs: &'a Node<'a>,
+        eql_t: &'a Token<'a>,
+        new_rhs: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let op_l = Some(loc(eql_t));
         let expr_l = join_exprs(lhs, new_rhs);
 
+        let lhs: &'a mut Node<'a> = unsafe { std::mem::transmute(lhs) };
         match lhs {
             Node::Cvasgn(cvasgn) => {
                 cvasgn.set_expression_l(expr_l);
@@ -1180,10 +1155,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn op_assign(
         &self,
-        mut lhs: &'a mut Node<'a>,
-        op_t: &'a mut Token<'a>,
-        rhs: &'a mut Node<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        mut lhs: &'a Node<'a>,
+        op_t: &'a Token<'a>,
+        rhs: &'a Node<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let operator_l = loc(op_t);
         let mut operator = String::from(value(op_t));
         operator.pop();
@@ -1209,7 +1184,7 @@ impl<'a> Builder<'a> {
                 lhs = Node::new_index_asgn(
                     self.bump,
                     recv,
-                    indexes.split_off(0),
+                    take_vec(indexes),
                     Maybe::none(),
                     begin_l.clone(),
                     end_l.clone(),
@@ -1219,7 +1194,7 @@ impl<'a> Builder<'a> {
             }
             Node::BackRef(BackRef { name, expression_l }) => {
                 self.error(
-                    DiagnosticMessage::new_cant_set_variable(name.split_off(0)),
+                    DiagnosticMessage::new_cant_set_variable(take_str(name)),
                     &expression_l,
                 );
                 return Err(());
@@ -1239,8 +1214,8 @@ impl<'a> Builder<'a> {
             }
         };
 
-        let recv: &'a mut Node = lhs;
-        let value: &'a mut Node = rhs;
+        let recv: &'a Node = lhs;
+        let value: &'a Node = rhs;
 
         let result = match &operator[..] {
             "&&" => Node::new_and_asgn(self.bump, recv, value, operator_l, expression_l),
@@ -1260,10 +1235,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn multi_lhs(
         &self,
-        begin_t: Maybe<&'a mut Token<'a>>,
-        items: Vec<'a, &'a mut Node<'a>>,
-        end_t: Maybe<&'a mut Token<'a>>,
-    ) -> &'a mut Node<'a> {
+        begin_t: Maybe<&'a Token<'a>>,
+        items: Vec<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token<'a>>,
+    ) -> &'a Node<'a> {
         let CollectionMap {
             begin_l,
             end_l,
@@ -1275,10 +1250,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn multi_assign(
         &self,
-        lhs: &'a mut Node<'a>,
-        eql_t: &'a mut Token<'a>,
-        rhs: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        lhs: &'a Node<'a>,
+        eql_t: &'a Token<'a>,
+        rhs: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let operator_l = loc(eql_t);
         let expression_l = join_exprs(lhs, rhs);
 
@@ -1291,13 +1266,13 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn def_class(
         &self,
-        class_t: &'a mut Token<'a>,
-        name: &'a mut Node<'a>,
-        lt_t: Maybe<&'a mut Token<'a>>,
-        superclass: Maybe<&'a mut Node<'a>>,
-        body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        class_t: &'a Token<'a>,
+        name: &'a Node<'a>,
+        lt_t: Maybe<&'a Token<'a>>,
+        superclass: Maybe<&'a Node<'a>>,
+        body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(class_t);
         let end_l = loc(end_t);
         let operator_l = maybe_loc(&lt_t);
@@ -1317,12 +1292,12 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn def_sclass(
         &self,
-        class_t: &'a mut Token<'a>,
-        lshift_t: &'a mut Token<'a>,
-        expr: &'a mut Node<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        class_t: &'a Token<'a>,
+        lshift_t: &'a Token<'a>,
+        expr: &'a Node<'a>,
+        body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(class_t);
         let end_l = loc(end_t);
         let operator_l = loc(lshift_t);
@@ -1341,11 +1316,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn def_module(
         &self,
-        module_t: &'a mut Token<'a>,
-        name: &'a mut Node<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        module_t: &'a Token<'a>,
+        name: &'a Node<'a>,
+        body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(module_t);
         let end_l = loc(end_t);
         let expression_l = keyword_l.join(&end_l);
@@ -1359,12 +1334,12 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn def_method(
         &self,
-        def_t: &'a mut Token<'a>,
-        name_t: &'a mut Token<'a>,
-        args: Maybe<&'a mut Node<'a>>,
-        body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        def_t: &'a Token<'a>,
+        name_t: &'a Token<'a>,
+        args: Maybe<&'a Node<'a>>,
+        body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let name_l = loc(name_t);
         let keyword_l = loc(def_t);
         let end_l = loc(end_t);
@@ -1388,12 +1363,12 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn def_endless_method(
         &self,
-        def_t: &'a mut Token<'a>,
-        name_t: &'a mut Token<'a>,
-        args: Maybe<&'a mut Node<'a>>,
-        assignment_t: &'a mut Token<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        def_t: &'a Token<'a>,
+        name_t: &'a Token<'a>,
+        args: Maybe<&'a Node<'a>>,
+        assignment_t: &'a Token<'a>,
+        body: Maybe<&'a Node<'a>>,
+    ) -> Result<&'a Node<'a>, ()> {
         let body_l = maybe_node_expr_mut(&body)
             .unwrap_or_else(|| unreachable!("endless method always has a body"));
 
@@ -1420,14 +1395,14 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn def_singleton(
         &self,
-        def_t: &'a mut Token<'a>,
-        definee: &'a mut Node<'a>,
-        dot_t: &'a mut Token<'a>,
-        name_t: &'a mut Token<'a>,
-        args: Maybe<&'a mut Node<'a>>,
-        body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        def_t: &'a Token<'a>,
+        definee: &'a Node<'a>,
+        dot_t: &'a Token<'a>,
+        name_t: &'a Token<'a>,
+        args: Maybe<&'a Node<'a>>,
+        body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let keyword_l = loc(def_t);
         let operator_l = loc(dot_t);
         let name_l = loc(name_t);
@@ -1454,14 +1429,14 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn def_endless_singleton(
         &self,
-        def_t: &'a mut Token<'a>,
-        definee: &'a mut Node<'a>,
-        dot_t: &'a mut Token<'a>,
-        name_t: &'a mut Token<'a>,
-        args: Maybe<&'a mut Node<'a>>,
-        assignment_t: &'a mut Token<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        def_t: &'a Token<'a>,
+        definee: &'a Node<'a>,
+        dot_t: &'a Token<'a>,
+        name_t: &'a Token<'a>,
+        args: Maybe<&'a Node<'a>>,
+        assignment_t: &'a Token<'a>,
+        body: Maybe<&'a Node<'a>>,
+    ) -> Result<&'a Node<'a>, ()> {
         let body_l = maybe_node_expr_mut(&body)
             .unwrap_or_else(|| unreachable!("endless method always has body"));
 
@@ -1491,9 +1466,9 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn undef_method(
         &self,
-        undef_t: &'a mut Token<'a>,
-        names: Vec<'a, &'a mut Node<'a>>,
-    ) -> &'a mut Node<'a> {
+        undef_t: &'a Token<'a>,
+        names: Vec<'a, &'a Node<'a>>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(undef_t);
         let expression_l = keyword_l.maybe_join(&collection_expr(&names));
         Node::new_undef(self.bump, names, keyword_l, expression_l)
@@ -1501,10 +1476,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn alias(
         &self,
-        alias_t: &'a mut Token<'a>,
-        to: &'a mut Node<'a>,
-        from: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        alias_t: &'a Token<'a>,
+        to: &'a Node<'a>,
+        from: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(alias_t);
         let expression_l = keyword_l.join(from.expression());
         Node::new_alias(self.bump, to, from, keyword_l, expression_l)
@@ -1516,10 +1491,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn args(
         &self,
-        begin_t: Maybe<&'a mut Token<'a>>,
-        mut args: Vec<'a, &'a mut Node<'a>>,
-        end_t: Maybe<&'a mut Token<'a>>,
-    ) -> Maybe<&'a mut Node<'a>> {
+        begin_t: Maybe<&'a Token<'a>>,
+        mut args: Vec<'a, &'a Node<'a>>,
+        end_t: Maybe<&'a Token<'a>>,
+    ) -> Maybe<&'a Node<'a>> {
         let map = self.bump.alloc(HashMap::new());
         match check_duplicate_args(&mut args, map) {
             Ok(_) => {}
@@ -1547,10 +1522,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn forward_only_args(
         &self,
-        begin_t: &'a mut Token<'a>,
-        dots_t: &'a mut Token<'a>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        begin_t: &'a Token<'a>,
+        dots_t: &'a Token<'a>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let args = bump_vec![in self.bump; self.forward_arg(dots_t)];
         let begin_l = loc(begin_t);
         let end_l = loc(end_t);
@@ -1558,11 +1533,11 @@ impl<'a> Builder<'a> {
         Node::new_args(self.bump, args, expression_l, Some(begin_l), Some(end_l))
     }
 
-    pub(crate) fn forward_arg(&self, dots_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn forward_arg(&self, dots_t: &'a Token<'a>) -> &'a Node<'a> {
         Node::new_forward_arg(self.bump, loc(dots_t))
     }
 
-    pub(crate) fn arg(&self, name_t: &'a mut Token<'a>) -> Result<&'a mut Node<'a>, ()> {
+    pub(crate) fn arg(&self, name_t: &'a Token<'a>) -> Result<&'a Node<'a>, ()> {
         let name_l = loc(name_t);
         let name = value(name_t);
 
@@ -1573,10 +1548,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn optarg(
         &self,
-        name_t: &'a mut Token<'a>,
-        eql_t: &'a mut Token<'a>,
-        default: &'a mut Node<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        name_t: &'a Token<'a>,
+        eql_t: &'a Token<'a>,
+        default: &'a Node<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let operator_l = loc(eql_t);
         let name_l = loc(name_t);
         let expression_l = loc(name_t).join(default.expression());
@@ -1596,9 +1571,9 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn restarg(
         &self,
-        star_t: &'a mut Token<'a>,
-        name_t: Maybe<&'a mut Token<'a>>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        star_t: &'a Token<'a>,
+        name_t: Maybe<&'a Token<'a>>,
+    ) -> Result<&'a Node<'a>, ()> {
         let (name, name_l) = if name_t.is_some() {
             let name_t = name_t.unwrap();
             let name_l = loc(name_t);
@@ -1621,7 +1596,7 @@ impl<'a> Builder<'a> {
         ))
     }
 
-    pub(crate) fn kwarg(&self, name_t: &'a mut Token<'a>) -> Result<&'a mut Node<'a>, ()> {
+    pub(crate) fn kwarg(&self, name_t: &'a Token<'a>) -> Result<&'a Node<'a>, ()> {
         let name_l = loc(name_t);
         let name = value(name_t);
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
@@ -1634,9 +1609,9 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn kwoptarg(
         &self,
-        name_t: &'a mut Token<'a>,
-        default: &'a mut Node<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        name_t: &'a Token<'a>,
+        default: &'a Node<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let name_l = loc(name_t);
         let name = value(name_t);
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
@@ -1656,9 +1631,9 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn kwrestarg(
         &self,
-        dstar_t: &'a mut Token<'a>,
-        name_t: Maybe<&'a mut Token<'a>>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        dstar_t: &'a Token<'a>,
+        name_t: Maybe<&'a Token<'a>>,
+    ) -> Result<&'a Node<'a>, ()> {
         let (name, name_l) = if name_t.is_some() {
             let name_t = name_t.unwrap();
             let name_l = loc(name_t);
@@ -1681,18 +1656,14 @@ impl<'a> Builder<'a> {
         ))
     }
 
-    pub(crate) fn kwnilarg(
-        &self,
-        dstar_t: &'a mut Token<'a>,
-        nil_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+    pub(crate) fn kwnilarg(&self, dstar_t: &'a Token<'a>, nil_t: &'a Token<'a>) -> &'a Node<'a> {
         let dstar_l = loc(dstar_t);
         let nil_l = loc(nil_t);
         let expression_l = dstar_l.join(&nil_l);
         Node::new_kwnilarg(self.bump, nil_l, expression_l)
     }
 
-    pub(crate) fn shadowarg(&self, name_t: &'a mut Token<'a>) -> Result<&'a mut Node<'a>, ()> {
+    pub(crate) fn shadowarg(&self, name_t: &'a Token<'a>) -> Result<&'a Node<'a>, ()> {
         let name_l = loc(name_t);
         let name = value(name_t);
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
@@ -1702,9 +1673,9 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn blockarg(
         &self,
-        amper_t: &'a mut Token<'a>,
-        name_t: &'a mut Token<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        amper_t: &'a Token<'a>,
+        name_t: &'a Token<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let name_l = loc(name_t);
         let name = value(name_t);
         self.check_reserved_for_numparam(name.as_str(), &name_l)?;
@@ -1721,7 +1692,7 @@ impl<'a> Builder<'a> {
         ))
     }
 
-    pub(crate) fn procarg0(&self, arg: &'a mut Node<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn procarg0(&self, arg: &'a Node<'a>) -> &'a Node<'a> {
         match arg {
             Node::Mlhs(Mlhs {
                 items,
@@ -1730,7 +1701,7 @@ impl<'a> Builder<'a> {
                 expression_l,
             }) => Node::new_procarg0(
                 self.bump,
-                items.split_off(0),
+                take_vec(items),
                 begin_l.clone(),
                 end_l.clone(),
                 expression_l.clone(),
@@ -1755,7 +1726,7 @@ impl<'a> Builder<'a> {
     // Method calls
     //
 
-    fn call_type_for_dot(&self, dot_t: &Maybe<&'a mut Token<'a>>) -> MethodCallType {
+    fn call_type_for_dot(&self, dot_t: &Maybe<&'a Token<'a>>) -> MethodCallType {
         // match dot_t.as_ref() {
         //     Some(token) if token.token_type() == Lexer::tANDDOT => MethodCallType::CSend,
         //     _ => MethodCallType::Send,
@@ -1763,25 +1734,25 @@ impl<'a> Builder<'a> {
         MethodCallType::Send
     }
 
-    pub(crate) fn forwarded_args(&self, dots_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn forwarded_args(&self, dots_t: &'a Token<'a>) -> &'a Node<'a> {
         Node::new_forwarded_args(self.bump, loc(dots_t))
     }
 
     pub(crate) fn call_method(
         &self,
-        receiver: Maybe<&'a mut Node<'a>>,
-        dot_t: Maybe<&'a mut Token<'a>>,
-        selector_t: Maybe<&'a mut Token<'a>>,
-        lparen_t: Maybe<&'a mut Token<'a>>,
-        mut args: Vec<'a, &'a mut Node<'a>>,
-        rparen_t: Maybe<&'a mut Token<'a>>,
-    ) -> &'a mut Node<'a> {
+        receiver: Maybe<&'a Node<'a>>,
+        dot_t: Maybe<&'a Token<'a>>,
+        selector_t: Maybe<&'a Token<'a>>,
+        lparen_t: Maybe<&'a Token<'a>>,
+        mut args: Vec<'a, &'a Node<'a>>,
+        rparen_t: Maybe<&'a Token<'a>>,
+    ) -> &'a Node<'a> {
         let begin_l = maybe_node_expr_mut(&receiver)
             .or_else(|| maybe_loc(&selector_t))
             .unwrap_or_else(|| unreachable!("can't compute begin_l"));
 
         let end_l = maybe_loc(&rparen_t)
-            .or_else(|| maybe_node_expr_mut(&args.last_mut().map(|x| &mut **x)))
+            .or_else(|| maybe_node_expr_mut(&args.last().map(|x| &**x)))
             .or_else(|| maybe_loc(&selector_t))
             .unwrap_or_else(|| unreachable!("can't compute end_l"));
 
@@ -1830,11 +1801,11 @@ impl<'a> Builder<'a> {
         }
     }
 
-    pub(crate) fn call_lambda(&self, lambda_t: &'a mut Token<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn call_lambda(&self, lambda_t: &'a Token<'a>) -> &'a Node<'a> {
         Node::new_lambda(self.bump, loc(lambda_t))
     }
 
-    fn validate_block_and_block_arg(&self, args: &Vec<'a, &'a mut Node<'a>>) -> Result<(), ()> {
+    fn validate_block_and_block_arg(&self, args: &Vec<'a, &'a Node<'a>>) -> Result<(), ()> {
         if let Some(last_arg) = args.last() {
             if last_arg.is_block_pass() || last_arg.is_forwarded_args() {
                 self.error(
@@ -1852,12 +1823,12 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn block(
         &self,
-        method_call: &'a mut Node<'a>,
-        begin_t: &'a mut Token<'a>,
+        method_call: &'a Node<'a>,
+        begin_t: &'a Token<'a>,
         block_args: ArgsType<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let block_body = body;
 
         match method_call {
@@ -1876,13 +1847,15 @@ impl<'a> Builder<'a> {
 
         fn rewrite_args_and_loc<'a>(
             bump: &'a Bump,
-            begin_t: &'a mut Token<'a>,
-            end_t: &'a mut Token<'a>,
-            method_args: &'a mut Vec<'a, &'a mut Node<'a>>,
+            begin_t: &'a Token<'a>,
+            end_t: &'a Token<'a>,
+            method_args: &'a Vec<'a, &'a Node<'a>>,
             keyword_expression_l: &'a Loc,
             block_args: ArgsType<'a>,
-            block_body: Maybe<&'a mut Node<'a>>,
-        ) -> (Vec<'a, &'a mut Node<'a>>, Loc) {
+            block_body: Maybe<&'a Node<'a>>,
+        ) -> (Vec<'a, &'a Node<'a>>, Loc) {
+            let method_args: &'a mut Vec<'a, &'a Node<'a>> =
+                unsafe { std::mem::transmute(method_args) };
             // Code like "return foo 1 do end" is reduced in a weird sequence.
             // Here, method_call is actually (return).
             let actual_send = method_args.pop().unwrap();
@@ -1943,7 +1916,7 @@ impl<'a> Builder<'a> {
                         method_call,
                         numargs,
                         {
-                            let block_body: Maybe<&'a mut Node<'a>> = block_body;
+                            let block_body: Maybe<&'a Node<'a>> = block_body;
                             block_body.expect("numblock always has body")
                         },
                         begin_l,
@@ -2013,11 +1986,7 @@ impl<'a> Builder<'a> {
 
         Ok(result)
     }
-    pub(crate) fn block_pass(
-        &self,
-        amper_t: &'a mut Token<'a>,
-        value: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+    pub(crate) fn block_pass(&self, amper_t: &'a Token<'a>, value: &'a Node<'a>) -> &'a Node<'a> {
         let amper_l = loc(amper_t);
         let expression_l = value.expression().join(&amper_l);
 
@@ -2026,14 +1995,14 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn attr_asgn(
         &self,
-        receiver: &'a mut Node<'a>,
-        dot_t: &'a mut Token<'a>,
-        selector_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        receiver: &'a Node<'a>,
+        dot_t: &'a Token<'a>,
+        selector_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let dot_l = loc(dot_t);
         let selector_l = loc(selector_t);
         let expression_l = receiver.expression().join(&selector_l);
-        let receiver: &'a mut Node = receiver;
+        let receiver: &'a Node = receiver;
 
         let method_name = String::from_str_in(&(value(selector_t) + "="), self.bump);
 
@@ -2068,11 +2037,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn index(
         &self,
-        recv: &'a mut Node<'a>,
-        lbrack_t: &'a mut Token<'a>,
-        mut indexes: Vec<'a, &'a mut Node<'a>>,
-        rbrack_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        recv: &'a Node<'a>,
+        lbrack_t: &'a Token<'a>,
+        mut indexes: Vec<'a, &'a Node<'a>>,
+        rbrack_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let begin_l = loc(lbrack_t);
         let end_l = loc(rbrack_t);
         let expression_l = recv.expression().join(&end_l);
@@ -2084,11 +2053,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn index_asgn(
         &self,
-        recv: &'a mut Node<'a>,
-        lbrack_t: &'a mut Token<'a>,
-        indexes: Vec<'a, &'a mut Node<'a>>,
-        rbrack_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        recv: &'a Node<'a>,
+        lbrack_t: &'a Token<'a>,
+        indexes: Vec<'a, &'a Node<'a>>,
+        rbrack_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let begin_l = loc(lbrack_t);
         let end_l = loc(rbrack_t);
         let expression_l = recv.expression().join(&end_l);
@@ -2107,10 +2076,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn binary_op(
         &self,
-        receiver: &'a mut Node<'a>,
-        operator_t: &'a mut Token<'a>,
-        arg: &'a mut Node<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        receiver: &'a Node<'a>,
+        operator_t: &'a Token<'a>,
+        arg: &'a Node<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let receiver = self.value_expr(receiver)?;
         let arg = self.value_expr(arg)?;
 
@@ -2133,10 +2102,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn match_op(
         &self,
-        receiver: &'a mut Node<'a>,
-        match_t: &'a mut Token<'a>,
-        arg: &'a mut Node<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        receiver: &'a Node<'a>,
+        match_t: &'a Token<'a>,
+        arg: &'a Node<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let receiver = self.value_expr(receiver)?;
         let arg = self.value_expr(arg)?;
 
@@ -2170,9 +2139,9 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn unary_op(
         &self,
-        op_t: &'a mut Token<'a>,
-        receiver: &'a mut Node<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        op_t: &'a Token<'a>,
+        receiver: &'a Node<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let receiver = self.value_expr(receiver)?;
 
         let selector_l = loc(op_t);
@@ -2198,11 +2167,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn not_op(
         &self,
-        not_t: &'a mut Token<'a>,
-        begin_t: Maybe<&'a mut Token<'a>>,
-        receiver: Maybe<&'a mut Node<'a>>,
-        end_t: Maybe<&'a mut Token<'a>>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        not_t: &'a Token<'a>,
+        begin_t: Maybe<&'a Token<'a>>,
+        receiver: Maybe<&'a Node<'a>>,
+        end_t: Maybe<&'a Token<'a>>,
+    ) -> Result<&'a Node<'a>, ()> {
         match receiver {
             Some(receiver) => {
                 let receiver = self.value_expr(receiver)?;
@@ -2271,16 +2240,16 @@ impl<'a> Builder<'a> {
     pub(crate) fn logical_op(
         &self,
         type_: LogicalOp,
-        lhs: &'a mut Node<'a>,
-        op_t: &'a mut Token<'a>,
-        rhs: &'a mut Node<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        lhs: &'a Node<'a>,
+        op_t: &'a Token<'a>,
+        rhs: &'a Node<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let lhs = self.value_expr(lhs)?;
 
         let operator_l = loc(op_t);
         let expression_l = join_exprs(lhs, rhs);
-        let lhs: &'a mut Node = lhs;
-        let rhs: &'a mut Node = rhs;
+        let lhs: &'a Node = lhs;
+        let rhs: &'a Node = rhs;
 
         let result = match type_ {
             LogicalOp::And => Node::new_and(self.bump, lhs, rhs, operator_l, expression_l),
@@ -2293,14 +2262,14 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn condition(
         &self,
-        cond_t: &'a mut Token<'a>,
-        cond: &'a mut Node<'a>,
-        then_t: &'a mut Token<'a>,
-        if_true: Maybe<&'a mut Node<'a>>,
-        else_t: Maybe<&'a mut Token<'a>>,
-        if_false: Maybe<&'a mut Node<'a>>,
-        end_t: Maybe<&'a mut Token<'a>>,
-    ) -> &'a mut Node<'a> {
+        cond_t: &'a Token<'a>,
+        cond: &'a Node<'a>,
+        then_t: &'a Token<'a>,
+        if_true: Maybe<&'a Node<'a>>,
+        else_t: Maybe<&'a Token<'a>>,
+        if_false: Maybe<&'a Node<'a>>,
+        end_t: Maybe<&'a Token<'a>>,
+    ) -> &'a Node<'a> {
         let mut end_l = maybe_loc(&end_t);
         if end_l.is_none() {
             end_l = maybe_node_expr_mut(&if_false);
@@ -2338,11 +2307,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn condition_mod(
         &self,
-        if_true: Maybe<&'a mut Node<'a>>,
-        if_false: Maybe<&'a mut Node<'a>>,
-        cond_t: &'a mut Token<'a>,
-        cond: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        if_true: Maybe<&'a Node<'a>>,
+        if_false: Maybe<&'a Node<'a>>,
+        cond_t: &'a Token<'a>,
+        cond: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let pre = match (if_true.as_ref(), if_false.as_ref()) {
             (None, None) => unreachable!("at least one of if_true/if_false is required"),
             (None, Some(if_false)) => if_false,
@@ -2365,12 +2334,12 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn ternary(
         &self,
-        cond: &'a mut Node<'a>,
-        question_t: &'a mut Token<'a>,
-        if_true: &'a mut Node<'a>,
-        colon_t: &'a mut Token<'a>,
-        if_false: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        cond: &'a Node<'a>,
+        question_t: &'a Token<'a>,
+        if_true: &'a Node<'a>,
+        colon_t: &'a Token<'a>,
+        if_false: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let expression_l = join_exprs(cond, if_false);
         let question_l = loc(question_t);
         let colon_l = loc(colon_t);
@@ -2390,15 +2359,15 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn when(
         &self,
-        when_t: &'a mut Token<'a>,
-        mut patterns: Vec<'a, &'a mut Node<'a>>,
-        then_t: &'a mut Token<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-    ) -> &'a mut Node<'a> {
+        when_t: &'a Token<'a>,
+        mut patterns: Vec<'a, &'a Node<'a>>,
+        then_t: &'a Token<'a>,
+        body: Maybe<&'a Node<'a>>,
+    ) -> &'a Node<'a> {
         let begin_l = loc(then_t);
 
         let expr_end_l = maybe_node_expr_mut(&body)
-            .or_else(|| maybe_node_expr_mut(&patterns.last_mut().map(|x| &mut **x)))
+            .or_else(|| maybe_node_expr_mut(&patterns.last().map(|x| &**x)))
             .unwrap_or_else(|| loc(when_t));
         let when_l = loc(when_t);
         let expression_l = when_l.join(&expr_end_l);
@@ -2408,13 +2377,13 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn case(
         &self,
-        case_t: &'a mut Token<'a>,
-        expr: Maybe<&'a mut Node<'a>>,
-        when_bodies: Vec<'a, &'a mut Node<'a>>,
-        else_t: Maybe<&'a mut Token<'a>>,
-        else_body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        case_t: &'a Token<'a>,
+        expr: Maybe<&'a Node<'a>>,
+        when_bodies: Vec<'a, &'a Node<'a>>,
+        else_t: Maybe<&'a Token<'a>>,
+        else_body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(case_t);
         let else_l = maybe_loc(&else_t);
         let end_l = loc(end_t);
@@ -2437,12 +2406,12 @@ impl<'a> Builder<'a> {
     pub(crate) fn loop_(
         &self,
         loop_type: LoopType,
-        keyword_t: &'a mut Token<'a>,
-        cond: &'a mut Node<'a>,
-        do_t: &'a mut Token<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        keyword_t: &'a Token<'a>,
+        cond: &'a Node<'a>,
+        do_t: &'a Token<'a>,
+        body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(keyword_t);
         let begin_l = loc(do_t);
         let end_l = loc(end_t);
@@ -2475,10 +2444,10 @@ impl<'a> Builder<'a> {
     pub(crate) fn loop_mod(
         &self,
         loop_type: LoopType,
-        body: &'a mut Node<'a>,
-        keyword_t: &'a mut Token<'a>,
-        cond: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        body: &'a Node<'a>,
+        keyword_t: &'a Token<'a>,
+        cond: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let expression_l = body.expression().join(cond.expression());
         let keyword_l = loc(keyword_t);
 
@@ -2514,14 +2483,14 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn for_(
         &self,
-        for_t: &'a mut Token<'a>,
-        iterator: &'a mut Node<'a>,
-        in_t: &'a mut Token<'a>,
-        iteratee: &'a mut Node<'a>,
-        do_t: &'a mut Token<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        for_t: &'a Token<'a>,
+        iterator: &'a Node<'a>,
+        in_t: &'a Token<'a>,
+        iteratee: &'a Node<'a>,
+        do_t: &'a Token<'a>,
+        body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(for_t);
         let operator_l = loc(in_t);
         let begin_l = loc(do_t);
@@ -2546,11 +2515,11 @@ impl<'a> Builder<'a> {
     pub(crate) fn keyword_cmd(
         &self,
         type_: KeywordCmd,
-        keyword_t: &'a mut Token<'a>,
-        lparen_t: Maybe<&'a mut Token<'a>>,
-        mut args: Vec<'a, &'a mut Node<'a>>,
-        rparen_t: Maybe<&'a mut Token<'a>>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        keyword_t: &'a Token<'a>,
+        lparen_t: Maybe<&'a Token<'a>>,
+        mut args: Vec<'a, &'a Node<'a>>,
+        rparen_t: Maybe<&'a Token<'a>>,
+    ) -> Result<&'a Node<'a>, ()> {
         let keyword_l = loc(keyword_t);
 
         if type_ == KeywordCmd::Yield && !args.is_empty() {
@@ -2573,7 +2542,7 @@ impl<'a> Builder<'a> {
         let end_l = maybe_loc(&rparen_t);
 
         let expr_end_l = end_l
-            .or_else(|| maybe_node_expr_mut(&args.last_mut().map(|x| &mut **x)))
+            .or_else(|| maybe_node_expr_mut(&args.last().map(|x| &**x)))
             .unwrap_or_else(|| keyword_l.clone());
 
         let expression_l = keyword_l.join(&expr_end_l);
@@ -2608,11 +2577,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn preexe(
         &self,
-        preexe_t: &'a mut Token<'a>,
-        lbrace_t: &'a mut Token<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-        rbrace_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        preexe_t: &'a Token<'a>,
+        lbrace_t: &'a Token<'a>,
+        body: Maybe<&'a Node<'a>>,
+        rbrace_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(preexe_t);
         let begin_l = loc(lbrace_t);
         let end_l = loc(rbrace_t);
@@ -2622,11 +2591,11 @@ impl<'a> Builder<'a> {
     }
     pub(crate) fn postexe(
         &self,
-        postexe_t: &'a mut Token<'a>,
-        lbrace_t: &'a mut Token<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-        rbrace_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        postexe_t: &'a Token<'a>,
+        lbrace_t: &'a Token<'a>,
+        body: Maybe<&'a Node<'a>>,
+        rbrace_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(postexe_t);
         let begin_l = loc(lbrace_t);
         let end_l = loc(rbrace_t);
@@ -2639,13 +2608,13 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn rescue_body(
         &self,
-        rescue_t: &'a mut Token<'a>,
-        exc_list: Maybe<&'a mut Node<'a>>,
-        assoc_t: Maybe<&'a mut Token<'a>>,
-        exc_var: Maybe<&'a mut Node<'a>>,
-        then_t: Maybe<&'a mut Token<'a>>,
-        body: Maybe<&'a mut Node<'a>>,
-    ) -> &'a mut Node<'a> {
+        rescue_t: &'a Token<'a>,
+        exc_list: Maybe<&'a Node<'a>>,
+        assoc_t: Maybe<&'a Token<'a>>,
+        exc_var: Maybe<&'a Node<'a>>,
+        then_t: Maybe<&'a Token<'a>>,
+        body: Maybe<&'a Node<'a>>,
+    ) -> &'a Node<'a> {
         let mut end_l = maybe_node_expr_mut(&body);
         if end_l.is_none() {
             end_l = maybe_loc(&then_t);
@@ -2681,18 +2650,18 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn begin_body(
         &self,
-        compound_stmt: Maybe<&'a mut Node<'a>>,
-        mut rescue_bodies: Vec<'a, &'a mut Node<'a>>,
-        else_: Option<(&'a mut Token<'a>, Maybe<&'a mut Node<'a>>)>,
-        ensure: Option<(&'a mut Token<'a>, Maybe<&'a mut Node<'a>>)>,
-    ) -> Maybe<&'a mut Node<'a>> {
-        let mut result: Maybe<&'a mut Node<'a>>;
+        compound_stmt: Maybe<&'a Node<'a>>,
+        mut rescue_bodies: Vec<'a, &'a Node<'a>>,
+        else_: Option<(&'a Token<'a>, Maybe<&'a Node<'a>>)>,
+        ensure: Option<(&'a Token<'a>, Maybe<&'a Node<'a>>)>,
+    ) -> Maybe<&'a Node<'a>> {
+        let mut result: Maybe<&'a Node<'a>>;
 
         if !rescue_bodies.is_empty() {
             if let Some((else_t, else_)) = else_ {
                 let mut begin_l = maybe_node_expr_mut(&compound_stmt);
                 if begin_l.is_none() {
-                    begin_l = maybe_node_expr_mut(&rescue_bodies.first_mut().map(|x| &mut **x));
+                    begin_l = maybe_node_expr_mut(&rescue_bodies.first_mut().map(|x| &**x));
                 }
                 let begin_l = if begin_l.is_none() {
                     unreachable!("can't compute begin_l")
@@ -2716,7 +2685,7 @@ impl<'a> Builder<'a> {
             } else {
                 let mut begin_l = maybe_node_expr_mut(&compound_stmt);
                 if begin_l.is_none() {
-                    begin_l = maybe_node_expr_mut(&rescue_bodies.first_mut().map(|v| &mut **v));
+                    begin_l = maybe_node_expr_mut(&rescue_bodies.first().map(|v| &**v));
                 }
                 let begin_l = if begin_l.is_none() {
                     unreachable!("can't compute begin_l")
@@ -2724,7 +2693,7 @@ impl<'a> Builder<'a> {
                     begin_l.unwrap()
                 };
 
-                let end_l = maybe_node_expr_mut(&rescue_bodies.last_mut().map(|v| &mut **v))
+                let end_l = maybe_node_expr_mut(&rescue_bodies.last().map(|v| &**v))
                     .unwrap_or_else(|| unreachable!("can't compute end_l"));
 
                 let expression_l = begin_l.join(&end_l);
@@ -2749,7 +2718,7 @@ impl<'a> Builder<'a> {
                     Node::Begin(Begin {
                         statements: stmts, ..
                     }) => {
-                        statements = stmts.split_off(0);
+                        statements = take_vec(stmts);
                     }
                     _ => statements.push(compound_stmt),
                 }
@@ -2805,7 +2774,7 @@ impl<'a> Builder<'a> {
 
             let begin_l = maybe_node_expr_mut(&result).unwrap_or_else(|| loc(ensure_t));
 
-            let end_l = maybe_node_expr_mut(&ensure_body.as_mut().map(|x| &mut **x))
+            let end_l = maybe_node_expr_mut(&ensure_body.as_mut().map(|x| &**x))
                 .unwrap_or_else(|| loc(ensure_t));
 
             let expression_l = begin_l.join(&end_l);
@@ -2826,10 +2795,7 @@ impl<'a> Builder<'a> {
     // Expression grouping
     //
 
-    pub(crate) fn compstmt(
-        &self,
-        mut statements: Vec<'a, &'a mut Node<'a>>,
-    ) -> Maybe<&'a mut Node<'a>> {
+    pub(crate) fn compstmt(&self, mut statements: Vec<'a, &'a Node<'a>>) -> Maybe<&'a Node<'a>> {
         match &statements[..] {
             [] => Maybe::none(),
             [_] => Some(statements.pop().unwrap()),
@@ -2853,10 +2819,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn begin(
         &self,
-        begin_t: &'a mut Token<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        begin_t: &'a Token<'a>,
+        body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let new_begin_l = loc(begin_t);
         let new_end_l = loc(end_t);
         let new_expression_l = new_begin_l.join(&new_end_l);
@@ -2864,6 +2830,7 @@ impl<'a> Builder<'a> {
         let new_begin_l = Some(new_begin_l);
         let new_end_l = Some(new_end_l);
 
+        let body: Maybe<&'a mut Node<'a>> = unsafe { std::mem::transmute(body) };
         match body {
             Some(body) => {
                 match body {
@@ -2882,7 +2849,7 @@ impl<'a> Builder<'a> {
                         body
                     }
                     _ => {
-                        let mut statements = bump_vec![in self.bump; ];
+                        let mut statements: Vec<'a, &'a Node> = bump_vec![in self.bump; ];
                         statements.push(body);
                         Node::new_begin(
                             self.bump,
@@ -2909,10 +2876,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn begin_keyword(
         &self,
-        begin_t: &'a mut Token<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        begin_t: &'a Token<'a>,
+        body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let begin_l = loc(begin_t);
         let end_l = loc(end_t);
         let expression_l = begin_l.join(&end_l);
@@ -2934,7 +2901,7 @@ impl<'a> Builder<'a> {
             match body {
                 Node::Begin(Begin { statements, .. }) => Node::new_kw_begin(
                     self.bump,
-                    statements.split_off(0),
+                    take_vec(statements),
                     begin_l,
                     end_l,
                     expression_l,
@@ -2964,15 +2931,15 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn case_match(
         &self,
-        case_t: &'a mut Token<'a>,
-        expr: &'a mut Node<'a>,
-        in_bodies: Vec<'a, &'a mut Node<'a>>,
-        mut else_t: Maybe<&'a mut Token<'a>>,
-        else_body: Maybe<&'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        case_t: &'a Token<'a>,
+        expr: &'a Node<'a>,
+        in_bodies: Vec<'a, &'a Node<'a>>,
+        mut else_t: Maybe<&'a Token<'a>>,
+        else_body: Maybe<&'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let else_body = match (else_t.as_mut(), else_body.as_ref()) {
-            (Some(else_t), None) => Some(Node::new_empty_else(self.bump, loc(&mut **else_t))),
+            (Some(else_t), None) => Some(Node::new_empty_else(self.bump, loc(&**else_t))),
             _ => else_body,
         };
 
@@ -2995,10 +2962,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn match_pattern(
         &self,
-        value: &'a mut Node<'a>,
-        assoc_t: &'a mut Token<'a>,
-        pattern: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        value: &'a Node<'a>,
+        assoc_t: &'a Token<'a>,
+        pattern: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let operator_l = loc(assoc_t);
         let expression_l = join_exprs(value, pattern);
 
@@ -3007,10 +2974,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn match_pattern_p(
         &self,
-        value: &'a mut Node<'a>,
-        in_t: &'a mut Token<'a>,
-        pattern: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        value: &'a Node<'a>,
+        in_t: &'a Token<'a>,
+        pattern: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let operator_l = loc(in_t);
         let expression_l = join_exprs(value, pattern);
 
@@ -3019,12 +2986,12 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn in_pattern(
         &self,
-        in_t: &'a mut Token<'a>,
-        pattern: &'a mut Node<'a>,
-        guard: Maybe<&'a mut Node<'a>>,
-        then_t: &'a mut Token<'a>,
-        body: Maybe<&'a mut Node<'a>>,
-    ) -> &'a mut Node<'a> {
+        in_t: &'a Token<'a>,
+        pattern: &'a Node<'a>,
+        guard: Maybe<&'a Node<'a>>,
+        then_t: &'a Token<'a>,
+        body: Maybe<&'a Node<'a>>,
+    ) -> &'a Node<'a> {
         let keyword_l = loc(in_t);
         let begin_l = loc(then_t);
 
@@ -3050,28 +3017,20 @@ impl<'a> Builder<'a> {
         )
     }
 
-    pub(crate) fn if_guard(
-        &self,
-        if_t: &'a mut Token<'a>,
-        cond: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+    pub(crate) fn if_guard(&self, if_t: &'a Token<'a>, cond: &'a Node<'a>) -> &'a Node<'a> {
         let keyword_l = loc(if_t);
         let expression_l = keyword_l.join(cond.expression());
 
         Node::new_if_guard(self.bump, cond, keyword_l, expression_l)
     }
-    pub(crate) fn unless_guard(
-        &self,
-        unless_t: &'a mut Token<'a>,
-        cond: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+    pub(crate) fn unless_guard(&self, unless_t: &'a Token<'a>, cond: &'a Node<'a>) -> &'a Node<'a> {
         let keyword_l = loc(unless_t);
         let expression_l = keyword_l.join(cond.expression());
 
         Node::new_unless_guard(self.bump, cond, keyword_l, expression_l)
     }
 
-    pub(crate) fn match_var(&self, name_t: &'a mut Token<'a>) -> Result<&'a mut Node<'a>, ()> {
+    pub(crate) fn match_var(&self, name_t: &'a Token<'a>) -> Result<&'a Node<'a>, ()> {
         let name_l = loc(name_t);
         let expression_l = name_l;
         let name = value(name_t);
@@ -3083,7 +3042,7 @@ impl<'a> Builder<'a> {
         Ok(Node::new_match_var(self.bump, name, name_l, expression_l))
     }
 
-    pub(crate) fn match_hash_var(&self, name_t: &'a mut Token<'a>) -> Result<&'a mut Node<'a>, ()> {
+    pub(crate) fn match_hash_var(&self, name_t: &'a Token<'a>) -> Result<&'a Node<'a>, ()> {
         let expression_l = loc(name_t);
         let name_l = expression_l.adjust_end(-1);
 
@@ -3097,10 +3056,10 @@ impl<'a> Builder<'a> {
     }
     pub(crate) fn match_hash_var_from_str(
         &self,
-        begin_t: &'a mut Token<'a>,
-        mut strings: Vec<'a, &'a mut Node<'a>>,
-        end_t: &'a mut Token<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        begin_t: &'a Token<'a>,
+        mut strings: Vec<'a, &'a Node<'a>>,
+        end_t: &'a Token<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         if strings.len() != 1 {
             self.error(
                 DiagnosticMessage::new_symbol_literal_with_interpolation(),
@@ -3145,7 +3104,7 @@ impl<'a> Builder<'a> {
                 Node::new_match_var(self.bump, name, name_l, expression_l)
             }
             Node::Begin(Begin { statements, .. }) => {
-                self.match_hash_var_from_str(begin_t, statements.split_off(0), end_t)?
+                self.match_hash_var_from_str(begin_t, take_vec(statements), end_t)?
             }
             _ => {
                 self.error(
@@ -3161,9 +3120,9 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn match_rest(
         &self,
-        star_t: &'a mut Token<'a>,
-        name_t: Maybe<&'a mut Token<'a>>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        star_t: &'a Token<'a>,
+        name_t: Maybe<&'a Token<'a>>,
+    ) -> Result<&'a Node<'a>, ()> {
         let name = if name_t.is_none() {
             Maybe::none()
         } else {
@@ -3184,10 +3143,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn hash_pattern(
         &self,
-        lbrace_t: Maybe<&'a mut Token<'a>>,
-        kwargs: Vec<'a, &'a mut Node<'a>>,
-        rbrace_t: Maybe<&'a mut Token<'a>>,
-    ) -> &'a mut Node<'a> {
+        lbrace_t: Maybe<&'a Token<'a>>,
+        kwargs: Vec<'a, &'a Node<'a>>,
+        rbrace_t: Maybe<&'a Token<'a>>,
+    ) -> &'a Node<'a> {
         let CollectionMap {
             begin_l,
             end_l,
@@ -3199,11 +3158,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn array_pattern(
         &self,
-        lbrack_t: Maybe<&'a mut Token<'a>>,
-        elements: Vec<'a, &'a mut Node<'a>>,
-        trailing_comma: Maybe<&'a mut Token<'a>>,
-        rbrack_t: Maybe<&'a mut Token<'a>>,
-    ) -> &'a mut Node<'a> {
+        lbrack_t: Maybe<&'a Token<'a>>,
+        elements: Vec<'a, &'a Node<'a>>,
+        trailing_comma: Maybe<&'a Token<'a>>,
+        rbrack_t: Maybe<&'a Token<'a>>,
+    ) -> &'a Node<'a> {
         let CollectionMap {
             begin_l,
             end_l,
@@ -3231,10 +3190,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn find_pattern(
         &self,
-        lbrack_t: Maybe<&'a mut Token<'a>>,
-        elements: Vec<'a, &'a mut Node<'a>>,
-        rbrack_t: Maybe<&'a mut Token<'a>>,
-    ) -> &'a mut Node<'a> {
+        lbrack_t: Maybe<&'a Token<'a>>,
+        elements: Vec<'a, &'a Node<'a>>,
+        rbrack_t: Maybe<&'a Token<'a>>,
+    ) -> &'a Node<'a> {
         let CollectionMap {
             begin_l,
             end_l,
@@ -3246,11 +3205,11 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn const_pattern(
         &self,
-        const_: &'a mut Node<'a>,
-        ldelim_t: &'a mut Token<'a>,
-        pattern: &'a mut Node<'a>,
-        rdelim_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        const_: &'a Node<'a>,
+        ldelim_t: &'a Token<'a>,
+        pattern: &'a Node<'a>,
+        rdelim_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let begin_l = loc(ldelim_t);
         let end_l = loc(rdelim_t);
         let expression_l = const_.expression().join(&loc(rdelim_t));
@@ -3258,7 +3217,7 @@ impl<'a> Builder<'a> {
         Node::new_const_pattern(self.bump, const_, pattern, begin_l, end_l, expression_l)
     }
 
-    pub(crate) fn pin(&self, pin_t: &'a mut Token<'a>, var: &'a mut Node<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn pin(&self, pin_t: &'a Token<'a>, var: &'a Node<'a>) -> &'a Node<'a> {
         let operator_l = loc(pin_t);
         let expression_l = var.expression().join(&operator_l);
 
@@ -3267,10 +3226,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn match_alt(
         &self,
-        lhs: &'a mut Node<'a>,
-        pipe_t: &'a mut Token<'a>,
-        rhs: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        lhs: &'a Node<'a>,
+        pipe_t: &'a Token<'a>,
+        rhs: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let operator_l = loc(pipe_t);
         let expression_l = join_exprs(lhs, rhs);
 
@@ -3279,10 +3238,10 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn match_as(
         &self,
-        value: &'a mut Node<'a>,
-        assoc_t: &'a mut Token<'a>,
-        as_: &'a mut Node<'a>,
-    ) -> &'a mut Node<'a> {
+        value: &'a Node<'a>,
+        assoc_t: &'a Token<'a>,
+        as_: &'a Node<'a>,
+    ) -> &'a Node<'a> {
         let operator_l = loc(assoc_t);
         let expression_l = join_exprs(value, as_);
 
@@ -3291,9 +3250,9 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn match_nil_pattern(
         &self,
-        dstar_t: &'a mut Token<'a>,
-        nil_t: &'a mut Token<'a>,
-    ) -> &'a mut Node<'a> {
+        dstar_t: &'a Token<'a>,
+        nil_t: &'a Token<'a>,
+    ) -> &'a Node<'a> {
         let operator_l = loc(dstar_t);
         let name_l = loc(nil_t);
         let expression_l = operator_l.join(&name_l);
@@ -3304,8 +3263,8 @@ impl<'a> Builder<'a> {
     pub(crate) fn match_pair(
         &self,
         p_kw_label: PKwLabel<'a>,
-        value: &'a mut Node<'a>,
-    ) -> Result<&'a mut Node<'a>, ()> {
+        value: &'a Node<'a>,
+    ) -> Result<&'a Node<'a>, ()> {
         let result = match p_kw_label {
             PKwLabel::PlainLabel(label_t) => {
                 self.check_duplicate_pattern_key(clone_value(label_t).as_str(), &loc(label_t))?;
@@ -3331,7 +3290,7 @@ impl<'a> Builder<'a> {
         Ok(result)
     }
 
-    pub(crate) fn match_label(&self, p_kw_label: PKwLabel<'a>) -> Result<&'a mut Node<'a>, ()> {
+    pub(crate) fn match_label(&self, p_kw_label: PKwLabel<'a>) -> Result<&'a Node<'a>, ()> {
         match p_kw_label {
             PKwLabel::PlainLabel(label_t) => self.match_hash_var(label_t),
             PKwLabel::QuotedLabel((begin_t, parts, end_t)) => {
@@ -3344,7 +3303,7 @@ impl<'a> Builder<'a> {
     // Verification
     //
 
-    pub(crate) fn check_condition(&self, cond: &'a mut Node<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn check_condition(&self, cond: &'a Node<'a>) -> &'a Node<'a> {
         let cond = cond;
 
         match cond {
@@ -3355,6 +3314,8 @@ impl<'a> Builder<'a> {
                 expression_l,
             }) => {
                 if statements.len() == 1 {
+                    let statements: &mut Vec<'a, &'a Node<'a>> =
+                        unsafe { std::mem::transmute(statements) };
                     let stmt = statements.pop().unwrap();
                     let stmt = self.check_condition(stmt);
                     Node::new_begin(
@@ -3367,7 +3328,7 @@ impl<'a> Builder<'a> {
                 } else {
                     Node::new_begin(
                         self.bump,
-                        statements.split_off(0),
+                        take_vec(statements),
                         begin_l.clone(),
                         end_l.clone(),
                         expression_l.clone(),
@@ -3380,8 +3341,8 @@ impl<'a> Builder<'a> {
                 operator_l,
                 expression_l,
             }) => {
-                let lhs = self.check_condition(&mut *lhs);
-                let rhs = self.check_condition(&mut *rhs);
+                let lhs = self.check_condition(&*lhs);
+                let rhs = self.check_condition(&*rhs);
                 Node::new_and(
                     self.bump,
                     lhs,
@@ -3396,8 +3357,8 @@ impl<'a> Builder<'a> {
                 operator_l,
                 expression_l,
             }) => {
-                let lhs = self.check_condition(&mut *lhs);
-                let rhs = self.check_condition(&mut *rhs);
+                let lhs = self.check_condition(&*lhs);
+                let rhs = self.check_condition(&*rhs);
                 Node::new_or(
                     self.bump,
                     lhs,
@@ -3413,8 +3374,8 @@ impl<'a> Builder<'a> {
                 expression_l,
             }) => Node::new_i_flip_flop(
                 self.bump,
-                left.as_mut().map(|node| self.check_condition(&mut **node)),
-                right.as_mut().map(|node| self.check_condition(&mut **node)),
+                left.as_ref().map(|node| self.check_condition(&**node)),
+                right.as_ref().map(|node| self.check_condition(&**node)),
                 operator_l.clone(),
                 expression_l.clone(),
             ),
@@ -3425,8 +3386,8 @@ impl<'a> Builder<'a> {
                 expression_l,
             }) => Node::new_e_flip_flop(
                 self.bump,
-                left.as_mut().map(|node| self.check_condition(&mut **node)),
-                right.as_mut().map(|node| self.check_condition(&mut **node)),
+                left.as_ref().map(|node| self.check_condition(&**node)),
+                right.as_ref().map(|node| self.check_condition(&**node)),
                 operator_l.clone(),
                 expression_l.clone(),
             ),
@@ -3526,7 +3487,7 @@ impl<'a> Builder<'a> {
     #[cfg(feature = "onig")]
     pub(crate) fn build_static_regexp(
         &self,
-        parts: &[&'a mut Node],
+        parts: &[&'a Node],
         options: &Maybe<String>,
         loc: &Loc,
     ) -> Option<Regex> {
@@ -3556,7 +3517,7 @@ impl<'a> Builder<'a> {
     #[cfg(feature = "onig")]
     pub(crate) fn validate_static_regexp(
         &self,
-        parts: &[&'a mut Node],
+        parts: &[&'a Node],
         options: &Maybe<String>,
         loc: &Loc,
     ) {
@@ -3566,7 +3527,7 @@ impl<'a> Builder<'a> {
     #[cfg(not(feature = "onig"))]
     pub(crate) fn validate_static_regexp(
         &self,
-        _parts: &[&'a mut Node],
+        _parts: &[&'a Node],
         _options: &Maybe<String>,
         _loc: &Loc,
     ) {
@@ -3605,7 +3566,7 @@ impl<'a> Builder<'a> {
         None
     }
 
-    pub(crate) fn is_heredoc(&self, begin_t: &Maybe<&'a mut Token<'a>>) -> bool {
+    pub(crate) fn is_heredoc(&self, begin_t: &Maybe<&'a Token<'a>>) -> bool {
         if let Some(begin_t) = begin_t.as_ref() {
             if clone_value(begin_t).as_str().starts_with("<<") {
                 return true;
@@ -3616,9 +3577,9 @@ impl<'a> Builder<'a> {
 
     pub(crate) fn heredoc_map(
         &self,
-        begin_t: &Maybe<&'a mut Token<'a>>,
-        parts: &[&'a mut Node<'a>],
-        end_t: &Maybe<&'a mut Token<'a>>,
+        begin_t: &Maybe<&'a Token<'a>>,
+        parts: &[&'a Node<'a>],
+        end_t: &Maybe<&'a Token<'a>>,
     ) -> HeredocMap {
         let expression_l = begin_t
             .as_ref()
@@ -3653,7 +3614,7 @@ impl<'a> Builder<'a> {
             .emit(Diagnostic::new(ErrorLevel::warning(), message, loc.clone()))
     }
 
-    pub(crate) fn value_expr(&self, node: &'a mut Node<'a>) -> Result<&'a mut Node<'a>, ()> {
+    pub(crate) fn value_expr(&self, node: &'a Node<'a>) -> Result<&'a Node<'a>, ()> {
         if let Some(void_node_loc) = self.void_value(node) {
             self.error(
                 DiagnosticMessage::new_void_value_expression(),
@@ -3665,7 +3626,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn void_value_check_stmts(&self, statements: &[&mut Node]) -> Option<Loc> {
+    fn void_value_check_stmts(&self, statements: &[&Node]) -> Option<Loc> {
         match statements.last() {
             Some(last_stmt) => self.void_value(*last_stmt),
             None => None,
@@ -3682,8 +3643,8 @@ impl<'a> Builder<'a> {
 
     fn void_value_check_maybe_condition(
         &self,
-        if_true: &Maybe<&mut Node>,
-        if_false: &Maybe<&mut Node>,
+        if_true: &Maybe<&Node>,
+        if_false: &Maybe<&Node>,
     ) -> Option<Loc> {
         match (if_true, if_false) {
             (None, None) | (None, Some(_)) | (Some(_), None) => None,
@@ -3717,7 +3678,7 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn rewrite_hash_args_to_kwargs<'b>(&self, args: &'b mut Vec<'a, &'a mut Node<'a>>) {
+    fn rewrite_hash_args_to_kwargs<'b>(&self, args: &'b mut Vec<'a, &'a Node<'a>>) {
         let len = args.len();
 
         if args.is_empty() {
@@ -3731,7 +3692,7 @@ impl<'a> Builder<'a> {
                 pairs,
                 expression_l,
             }) => {
-                let kwargs = Node::new_kwargs(self.bump, pairs.split_off(0), expression_l.clone());
+                let kwargs = Node::new_kwargs(self.bump, take_vec(pairs), expression_l.clone());
                 args.push(kwargs);
                 return;
             }
@@ -3756,7 +3717,7 @@ impl<'a> Builder<'a> {
                 }),
             ) => {
                 let block_pass = pre_last;
-                let kwargs = Node::new_kwargs(self.bump, pairs.split_off(0), expression_l.clone());
+                let kwargs = Node::new_kwargs(self.bump, take_vec(pairs), expression_l.clone());
                 args.push(kwargs);
                 args.push(block_pass);
             }
@@ -3807,7 +3768,7 @@ pub(crate) fn loc(token: &Token) -> Loc {
     token.loc().clone()
 }
 
-pub(crate) fn maybe_loc(token: &Maybe<&mut Token>) -> Maybe<Loc> {
+pub(crate) fn maybe_loc(token: &Maybe<&Token>) -> Maybe<Loc> {
     match token.as_ref() {
         Some(token) => Some(loc(*token)),
         None => None,
@@ -3815,9 +3776,9 @@ pub(crate) fn maybe_loc(token: &Maybe<&mut Token>) -> Maybe<Loc> {
 }
 
 pub(crate) fn collection_map<'a>(
-    begin_t: &Maybe<&mut Token>,
-    parts: &[&'a mut Node<'a>],
-    end_t: &Maybe<&mut Token>,
+    begin_t: &Maybe<&Token>,
+    parts: &[&'a Node<'a>],
+    end_t: &Maybe<&Token>,
 ) -> CollectionMap {
     let begin_l = maybe_loc(begin_t);
     let end_l = maybe_loc(end_t);
@@ -3836,7 +3797,7 @@ pub(crate) fn collection_map<'a>(
     }
 }
 
-pub(crate) fn maybe_node_expr_mut(node: &Option<&mut Node>) -> Maybe<Loc> {
+pub(crate) fn maybe_node_expr_mut(node: &Option<&Node>) -> Maybe<Loc> {
     match node {
         Some(node) => Some(node.expression().clone()),
         None => None,
@@ -3867,13 +3828,13 @@ pub(crate) fn join_maybe_exprs(lhs: &Option<&Node>, rhs: &Option<&Node>) -> Mayb
     join_maybe_locs(&maybe_node_expr(lhs), &maybe_node_expr(rhs))
 }
 
-pub(crate) fn collection_expr<'a>(nodes: &[&'a mut Node<'a>]) -> Maybe<Loc> {
+pub(crate) fn collection_expr<'a>(nodes: &[&'a Node<'a>]) -> Maybe<Loc> {
     let first = nodes.first().map(|x| &**x);
     let last = nodes.last().map(|x| &**x);
     join_maybe_exprs(&first, &last)
 }
 
-pub(crate) fn value<'a>(token: &'a mut Token<'a>) -> String<'a> {
+pub(crate) fn value<'a>(token: &'a Token<'a>) -> String<'a> {
     token.into_string().unwrap()
 }
 
@@ -3885,11 +3846,11 @@ pub(crate) fn clone_value<'a>(token: &'a Token<'a>) -> String<'a> {
     token.to_string().unwrap().clone()
 }
 
-pub(crate) fn maybe_value<'a>(token: Maybe<&'a mut Token<'a>>) -> Maybe<String<'a>> {
+pub(crate) fn maybe_value<'a>(token: Maybe<&'a Token<'a>>) -> Maybe<String<'a>> {
     token.map(|t| value(t))
 }
 
-pub(crate) fn static_string<'a>(bump: &'a Bump, nodes: &[&'a mut Node<'a>]) -> Option<String<'a>> {
+pub(crate) fn static_string<'a>(bump: &'a Bump, nodes: &[&'a Node<'a>]) -> Option<String<'a>> {
     let mut result = String::from_str_in("", bump);
 
     for node in nodes {
@@ -4011,7 +3972,7 @@ pub(crate) fn check_duplicate_arg<'a>(
 }
 
 pub(crate) fn check_duplicate_args<'a>(
-    args: &[&'a mut Node<'a>],
+    args: &[&'a Node<'a>],
     map: &mut HashMap<&'a str, &'a Node<'a>>,
 ) -> Result<(), &'a Loc> {
     Ok(())
@@ -4041,4 +4002,19 @@ pub(crate) fn check_duplicate_args<'a>(
     //         }
     //     }
     // }
+}
+
+fn take_vec<'a>(vec: &Vec<'a, &'a Node<'a>>) -> Vec<'a, &'a Node<'a>> {
+    let vec: &mut Vec<'a, &'a Node<'a>> = unsafe { std::mem::transmute(vec) };
+    vec.split_off(0)
+}
+
+fn take_str<'a>(s: &String<'a>) -> String<'a> {
+    let s: &mut String<'a> = unsafe { std::mem::transmute(s) };
+    s.split_off(0)
+}
+
+fn take_maybe_node<'a>(maybe_node: &Option<&'a Node<'a>>) -> Option<&'a Node<'a>> {
+    let maybe_node: &mut Option<&'a Node<'a>> = unsafe { std::mem::transmute(maybe_node) };
+    maybe_node.take()
 }

@@ -14,13 +14,13 @@ const ESCAPE_META: usize = 2;
 
 impl<'a> Lexer<'a> {
     fn take_strterm(&mut self) -> StringLiteral<'a> {
-        match self.strterm.take().map(|v| *v) {
+        match self.strterm.take().map(|v| v) {
             Some(StrTerm::StringLiteral(s)) => s,
             _ => unreachable!("strterm must be string"),
         }
     }
     fn restore_strterm(&mut self, literal: StringLiteral<'a>) {
-        self.strterm = Some(self.bump.alloc(StrTerm::StringLiteral(literal)));
+        self.strterm = Some(StrTerm::StringLiteral(literal));
     }
 
     pub(crate) fn parse_string(&mut self) -> i32 {
@@ -143,7 +143,7 @@ impl<'a> Lexer<'a> {
         Self::tSTRING_END
     }
 
-    fn regx_options(&mut self) -> String {
+    fn regx_options(&mut self) -> String<'a> {
         let mut c: MaybeByte;
         let mut result = String::from_str_in("", self.bump);
 

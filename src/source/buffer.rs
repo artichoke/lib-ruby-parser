@@ -344,7 +344,7 @@ impl<'a> Buffer<'a> {
         byte.is_ascii_alphanumeric() || byte == b'_' || !byte.is_ascii()
     }
 
-    pub(crate) fn set_encoding(&mut self, encoding: &str) -> Result<(), InputError> {
+    pub(crate) fn set_encoding(&mut self, encoding: &str) -> Result<(), InputError<'a>> {
         self.input.set_encoding(encoding)
     }
 }

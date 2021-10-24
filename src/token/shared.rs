@@ -1,5 +1,5 @@
 use super::Token;
-// use crate::parser::token_name;
+use crate::parser::token_name;
 
 crate::use_native_or_external!(Vec);
 crate::use_native_or_external!(String);
@@ -8,8 +8,7 @@ impl std::fmt::Debug for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!(
             "[{}, {:?}, {}...{}]",
-            "foo",
-            // self.token_name(),
+            self.token_name(),
             self.token_value().to_string_lossy(),
             self.loc().begin(),
             self.loc().end(),
@@ -44,15 +43,16 @@ impl<'a> Token<'a> {
     }
 
     /// Consumes a token and converts it into a string
+    #[allow(mutable_transmutes)]
     pub fn into_string(
-        &mut self,
+        &self,
     ) -> Result<String<'a>, bumpalo::collections::string::FromUtf8Error<'a>> {
-        self.token_value.into_string()
+        let mut_self: &mut Self = unsafe { std::mem::transmute(self) };
+        mut_self.token_value.into_string()
     }
 
     /// Returns name of the token
     pub fn token_name(&self) -> &'static str {
-        // token_name(self.token_type())
-        todo!()
+        token_name(self.token_type())
     }
 }

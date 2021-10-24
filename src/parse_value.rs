@@ -8,7 +8,7 @@ use crate::Node;
 use crate::Token;
 
 impl<'a> Node<'a> {
-    pub(crate) fn from(value: ParseValue<'a>) -> &'a mut Node<'a> {
+    pub(crate) fn from(value: ParseValue<'a>) -> &'a Node<'a> {
         match value {
             ParseValue::Node(value) => value,
             other => unreachable!("expected Node, got {:?}", other),
@@ -20,7 +20,7 @@ impl<'a> Node<'a> {
 pub(crate) mod BoxedNode {
     use super::{Node, ParseValue, Ptr};
 
-    pub(crate) fn from<'a>(value: ParseValue<'a>) -> &'a mut Node {
+    pub(crate) fn from<'a>(value: ParseValue<'a>) -> &'a Node {
         match value {
             ParseValue::Node(value) => value,
             other => unreachable!("expected BoxedNode, got {:?}", other),
@@ -29,7 +29,7 @@ pub(crate) mod BoxedNode {
 }
 
 impl<'a> Token<'a> {
-    pub(crate) fn from(value: ParseValue<'a>) -> &'a mut Token {
+    pub(crate) fn from(value: ParseValue<'a>) -> &'a Token {
         match value {
             ParseValue::Token(value) => value,
             other => unreachable!("expected Token<'a>, got {:?}", other),
@@ -41,7 +41,7 @@ impl<'a> Token<'a> {
 pub(crate) mod NodeList {
     use super::{Node, ParseValue, Vec};
 
-    pub(crate) fn from<'a>(value: ParseValue<'a>) -> Vec<'a, &'a mut Node<'a>> {
+    pub(crate) fn from<'a>(value: ParseValue<'a>) -> Vec<'a, &'a Node<'a>> {
         match value {
             ParseValue::NodeList(value) => value,
             other => unreachable!("expected NodeList, got {:?}", other),
@@ -65,7 +65,7 @@ pub(crate) mod Bool {
 pub(crate) mod MaybeStrTerm {
     use super::{ParseValue, StrTerm};
 
-    pub(crate) fn from<'a>(value: ParseValue<'a>) -> Option<&'a StrTerm<'a>> {
+    pub(crate) fn from<'a>(value: ParseValue<'a>) -> Option<StrTerm<'a>> {
         match value {
             ParseValue::MaybeStrTerm(value) => value,
             other => unreachable!("expected MaybeStrTerm, got {:?}", other),
@@ -87,8 +87,8 @@ pub(crate) mod Num {
 
 #[derive(Debug)]
 pub(crate) struct Superclass<'a> {
-    pub(crate) lt_t: Maybe<&'a mut Token<'a>>,
-    pub(crate) value: Maybe<&'a mut Node<'a>>,
+    pub(crate) lt_t: Maybe<&'a Token<'a>>,
+    pub(crate) value: Maybe<&'a Node<'a>>,
 }
 impl<'a> Superclass<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> Superclass<'a> {
@@ -101,8 +101,8 @@ impl<'a> Superclass<'a> {
 
 #[derive(Debug)]
 pub(crate) struct Ensure<'a> {
-    pub(crate) ensure_t: &'a mut Token<'a>,
-    pub(crate) body: Maybe<&'a mut Node<'a>>,
+    pub(crate) ensure_t: &'a Token<'a>,
+    pub(crate) body: Maybe<&'a Node<'a>>,
 }
 #[allow(non_snake_case)]
 pub(crate) mod OptEnsure {
@@ -118,8 +118,8 @@ pub(crate) mod OptEnsure {
 
 #[derive(Debug)]
 pub(crate) struct Else<'a> {
-    pub(crate) else_t: &'a mut Token<'a>,
-    pub(crate) body: Maybe<&'a mut Node<'a>>,
+    pub(crate) else_t: &'a Token<'a>,
+    pub(crate) body: Maybe<&'a Node<'a>>,
 }
 #[allow(non_snake_case)]
 pub(crate) mod OptElse {
@@ -135,8 +135,8 @@ pub(crate) mod OptElse {
 
 #[derive(Debug)]
 pub(crate) struct ExcVar<'a> {
-    pub(crate) assoc_t: Maybe<&'a mut Token<'a>>,
-    pub(crate) exc_var: Maybe<&'a mut Node<'a>>,
+    pub(crate) assoc_t: Maybe<&'a Token<'a>>,
+    pub(crate) exc_var: Maybe<&'a Node<'a>>,
 }
 impl<'a> ExcVar<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> ExcVar<'a> {
@@ -149,8 +149,8 @@ impl<'a> ExcVar<'a> {
 
 #[derive(Debug)]
 pub(crate) struct IfTail<'a> {
-    pub(crate) keyword_t: Maybe<&'a mut Token<'a>>,
-    pub(crate) body: Maybe<&'a mut Node<'a>>,
+    pub(crate) keyword_t: Maybe<&'a Token<'a>>,
+    pub(crate) body: Maybe<&'a Node<'a>>,
 }
 impl<'a> IfTail<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> IfTail<'a> {
@@ -163,8 +163,8 @@ impl<'a> IfTail<'a> {
 
 #[derive(Debug)]
 pub(crate) struct ExprValueDo<'a> {
-    pub(crate) value: &'a mut Node<'a>,
-    pub(crate) do_t: &'a mut Token<'a>,
+    pub(crate) value: &'a Node<'a>,
+    pub(crate) do_t: &'a Token<'a>,
 }
 impl<'a> ExprValueDo<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> ExprValueDo<'a> {
@@ -187,7 +187,7 @@ impl<'a> PKwLabel<'a> {
 #[derive(Debug)]
 pub(crate) struct BraceBody<'a> {
     pub(crate) args_type: ArgsType<'a>,
-    pub(crate) body: Maybe<&'a mut Node<'a>>,
+    pub(crate) body: Maybe<&'a Node<'a>>,
 }
 impl<'a> BraceBody<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> BraceBody<'a> {
@@ -200,10 +200,10 @@ impl<'a> BraceBody<'a> {
 
 #[derive(Debug)]
 pub(crate) struct CmdBraceBlock<'a> {
-    pub(crate) begin_t: &'a mut Token<'a>,
+    pub(crate) begin_t: &'a Token<'a>,
     pub(crate) args_type: ArgsType<'a>,
-    pub(crate) body: Maybe<&'a mut Node<'a>>,
-    pub(crate) end_t: &'a mut Token<'a>,
+    pub(crate) body: Maybe<&'a Node<'a>>,
+    pub(crate) end_t: &'a Token<'a>,
 }
 impl<'a> CmdBraceBlock<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> CmdBraceBlock<'a> {
@@ -216,9 +216,9 @@ impl<'a> CmdBraceBlock<'a> {
 
 #[derive(Debug)]
 pub(crate) struct ParenArgs<'a> {
-    pub(crate) begin_t: &'a mut Token<'a>,
-    pub(crate) args: Vec<'a, &'a mut Node<'a>>,
-    pub(crate) end_t: &'a mut Token<'a>,
+    pub(crate) begin_t: &'a Token<'a>,
+    pub(crate) args: Vec<'a, &'a Node<'a>>,
+    pub(crate) end_t: &'a Token<'a>,
 }
 impl<'a> ParenArgs<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> ParenArgs<'a> {
@@ -231,9 +231,9 @@ impl<'a> ParenArgs<'a> {
 
 #[derive(Debug)]
 pub(crate) struct OptParenArgs<'a> {
-    pub(crate) begin_t: Maybe<&'a mut Token<'a>>,
-    pub(crate) args: Vec<'a, &'a mut Node<'a>>,
-    pub(crate) end_t: Maybe<&'a mut Token<'a>>,
+    pub(crate) begin_t: Maybe<&'a Token<'a>>,
+    pub(crate) args: Vec<'a, &'a Node<'a>>,
+    pub(crate) end_t: Maybe<&'a Token<'a>>,
 }
 impl<'a> OptParenArgs<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> OptParenArgs {
@@ -246,9 +246,9 @@ impl<'a> OptParenArgs<'a> {
 
 #[derive(Debug)]
 pub(crate) struct BeginBlock<'a> {
-    pub(crate) begin_t: &'a mut Token<'a>,
-    pub(crate) body: Maybe<&'a mut Node<'a>>,
-    pub(crate) end_t: &'a mut Token<'a>,
+    pub(crate) begin_t: &'a Token<'a>,
+    pub(crate) body: Maybe<&'a Node<'a>>,
+    pub(crate) end_t: &'a Token<'a>,
 }
 impl<'a> BeginBlock<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> BeginBlock {
@@ -261,9 +261,9 @@ impl<'a> BeginBlock<'a> {
 
 #[derive(Debug)]
 pub(crate) struct LambdaBody<'a> {
-    pub(crate) begin_t: &'a mut Token<'a>,
-    pub(crate) body: Maybe<&'a mut Node<'a>>,
-    pub(crate) end_t: &'a mut Token<'a>,
+    pub(crate) begin_t: &'a Token<'a>,
+    pub(crate) body: Maybe<&'a Node<'a>>,
+    pub(crate) end_t: &'a Token<'a>,
 }
 impl<'a> LambdaBody<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> LambdaBody<'a> {
@@ -276,10 +276,10 @@ impl<'a> LambdaBody<'a> {
 
 #[derive(Debug)]
 pub(crate) struct DoBlock<'a> {
-    pub(crate) begin_t: &'a mut Token<'a>,
+    pub(crate) begin_t: &'a Token<'a>,
     pub(crate) args_type: ArgsType<'a>,
-    pub(crate) body: Maybe<&'a mut Node<'a>>,
-    pub(crate) end_t: &'a mut Token<'a>,
+    pub(crate) body: Maybe<&'a Node<'a>>,
+    pub(crate) end_t: &'a Token<'a>,
 }
 impl<'a> DoBlock<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> DoBlock<'a> {
@@ -292,10 +292,10 @@ impl<'a> DoBlock<'a> {
 
 #[derive(Debug)]
 pub(crate) struct BraceBlock<'a> {
-    pub(crate) begin_t: &'a mut Token<'a>,
+    pub(crate) begin_t: &'a Token<'a>,
     pub(crate) args_type: ArgsType<'a>,
-    pub(crate) body: Maybe<&'a mut Node<'a>>,
-    pub(crate) end_t: &'a mut Token<'a>,
+    pub(crate) body: Maybe<&'a Node<'a>>,
+    pub(crate) end_t: &'a Token<'a>,
 }
 impl<'a> BraceBlock<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> BraceBlock<'a> {
@@ -308,10 +308,10 @@ impl<'a> BraceBlock<'a> {
 
 #[derive(Debug)]
 pub(crate) struct DefsHead<'a> {
-    pub(crate) def_t: &'a mut Token<'a>,
-    pub(crate) definee: &'a mut Node<'a>,
-    pub(crate) dot_t: &'a mut Token<'a>,
-    pub(crate) name_t: &'a mut Token<'a>,
+    pub(crate) def_t: &'a Token<'a>,
+    pub(crate) definee: &'a Node<'a>,
+    pub(crate) dot_t: &'a Token<'a>,
+    pub(crate) name_t: &'a Token<'a>,
 }
 impl<'a> DefsHead<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> DefsHead<'a> {
@@ -324,8 +324,8 @@ impl<'a> DefsHead<'a> {
 
 #[derive(Debug)]
 pub(crate) struct DefnHead<'a> {
-    pub(crate) def_t: &'a mut Token<'a>,
-    pub(crate) name_t: &'a mut Token<'a>,
+    pub(crate) def_t: &'a Token<'a>,
+    pub(crate) name_t: &'a Token<'a>,
 }
 impl<'a> DefnHead<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> DefnHead<'a> {
@@ -338,7 +338,7 @@ impl<'a> DefnHead<'a> {
 
 #[derive(Debug)]
 pub(crate) struct Cases<'a> {
-    pub(crate) when_bodies: Vec<'a, &'a mut Node<'a>>,
+    pub(crate) when_bodies: Vec<'a, &'a Node<'a>>,
     pub(crate) opt_else: Option<Else<'a>>,
 }
 impl<'a> Cases<'a> {
@@ -352,7 +352,7 @@ impl<'a> Cases<'a> {
 
 #[derive(Debug)]
 pub(crate) struct CaseBody<'a> {
-    pub(crate) when_bodies: Vec<'a, &'a mut Node<'a>>,
+    pub(crate) when_bodies: Vec<'a, &'a Node<'a>>,
     pub(crate) opt_else: Option<Else<'a>>,
 }
 impl<'a> CaseBody<'a> {
@@ -366,7 +366,7 @@ impl<'a> CaseBody<'a> {
 
 #[derive(Debug)]
 pub(crate) struct PCases<'a> {
-    pub(crate) in_bodies: Vec<'a, &'a mut Node<'a>>,
+    pub(crate) in_bodies: Vec<'a, &'a Node<'a>>,
     pub(crate) opt_else: Option<Else<'a>>,
 }
 impl<'a> PCases<'a> {
@@ -380,7 +380,7 @@ impl<'a> PCases<'a> {
 
 #[derive(Debug)]
 pub(crate) struct PCaseBody<'a> {
-    pub(crate) in_bodies: Vec<'a, &'a mut Node<'a>>,
+    pub(crate) in_bodies: Vec<'a, &'a Node<'a>>,
     pub(crate) opt_else: Option<Else<'a>>,
 }
 impl<'a> PCaseBody<'a> {
@@ -396,7 +396,7 @@ impl<'a> PCaseBody<'a> {
 pub(crate) mod MaybeNode {
     use super::{Node, ParseValue, PtrAPI};
 
-    pub(crate) fn from<'a>(value: ParseValue<'a>) -> Option<&'a mut Node<'a>> {
+    pub(crate) fn from<'a>(value: ParseValue<'a>) -> Option<&'a Node<'a>> {
         match value {
             ParseValue::MaybeNode(value) => value,
             other => unreachable!("expected MaybeNode, got {:?}", other),
@@ -408,7 +408,7 @@ pub(crate) mod MaybeNode {
 pub(crate) mod MaybeBoxedNode {
     use super::{Maybe, Node, ParseValue, Ptr};
 
-    pub(crate) fn from<'a>(value: ParseValue<'a>) -> Maybe<&'a mut Node<'a>> {
+    pub(crate) fn from<'a>(value: ParseValue<'a>) -> Maybe<&'a Node<'a>> {
         match value {
             ParseValue::MaybeNode(value) => value,
             other => unreachable!("expected MaybeNode, got {:?}", other),
@@ -419,7 +419,7 @@ pub(crate) mod MaybeBoxedNode {
 #[derive(Debug)]
 pub(crate) struct DoBody<'a> {
     pub(crate) args_type: ArgsType<'a>,
-    pub(crate) body: Maybe<&'a mut Node<'a>>,
+    pub(crate) body: Maybe<&'a Node<'a>>,
 }
 impl<'a> DoBody<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> DoBody<'a> {
@@ -432,8 +432,8 @@ impl<'a> DoBody<'a> {
 
 #[derive(Debug)]
 pub(crate) struct PTopExpr<'a> {
-    pub(crate) pattern: &'a mut Node<'a>,
-    pub(crate) guard: Maybe<&'a mut Node<'a>>,
+    pub(crate) pattern: &'a Node<'a>,
+    pub(crate) guard: Maybe<&'a Node<'a>>,
 }
 impl<'a> PTopExpr<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> PTopExpr<'a> {
@@ -446,8 +446,8 @@ impl<'a> PTopExpr<'a> {
 
 #[derive(Debug)]
 pub(crate) struct MatchPatternWithTrailingComma<'a> {
-    pub(crate) elements: Vec<'a, &'a mut Node<'a>>,
-    pub(crate) trailing_comma: Maybe<&'a mut Token<'a>>,
+    pub(crate) elements: Vec<'a, &'a Node<'a>>,
+    pub(crate) trailing_comma: Maybe<&'a Token<'a>>,
 }
 impl<'a> MatchPatternWithTrailingComma<'a> {
     pub(crate) fn from(value: ParseValue<'a>) -> MatchPatternWithTrailingComma<'a> {
@@ -463,12 +463,12 @@ pub(crate) enum ParseValue<'a> {
     Stolen,
     Uninitialized,
     None,
-    Token(&'a mut Token<'a>),
-    TokenList(Vec<'a, &'a mut Token<'a>>),
-    Node(&'a mut Node<'a>),
-    NodeList(Vec<'a, &'a mut Node<'a>>),
+    Token(&'a Token<'a>),
+    TokenList(Vec<'a, &'a Token<'a>>),
+    Node(&'a Node<'a>),
+    NodeList(Vec<'a, &'a Node<'a>>),
     Bool(bool),
-    MaybeStrTerm(Option<&'a StrTerm<'a>>),
+    MaybeStrTerm(Option<StrTerm<'a>>),
     Num(i32),
 
     /* For custom superclass rule */
@@ -535,7 +535,7 @@ pub(crate) enum ParseValue<'a> {
     PCaseBody(PCaseBody<'a>),
 
     /* For custom compstmt rule */
-    MaybeNode(Maybe<&'a mut Node<'a>>),
+    MaybeNode(Maybe<&'a Node<'a>>),
 
     /* For custom do_body rule */
     DoBody(DoBody<'a>),
@@ -548,7 +548,7 @@ pub(crate) enum ParseValue<'a> {
 }
 
 impl<'a> ParseValue<'a> {
-    pub(crate) fn from_token(token: &'a mut Token<'a>) -> Self {
+    pub(crate) fn from_token(token: &'a Token<'a>) -> Self {
         Self::Token(token)
     }
 
@@ -629,13 +629,13 @@ impl<'a> ParseValue<'a> {
     pub(crate) fn new_none() -> Self {
         Self::None
     }
-    pub(crate) fn new_node(node: &'a mut Node<'a>) -> Self {
+    pub(crate) fn new_node(node: &'a Node<'a>) -> Self {
         Self::Node(node)
     }
-    pub(crate) fn new_maybe_node(maybe_node: Option<&'a mut Node<'a>>) -> Self {
+    pub(crate) fn new_maybe_node(maybe_node: Option<&'a Node<'a>>) -> Self {
         Self::MaybeNode(maybe_node)
     }
-    pub(crate) fn new_node_list(node_list: Vec<'a, &'a mut Node<'a>>) -> Self {
+    pub(crate) fn new_node_list(node_list: Vec<'a, &'a Node<'a>>) -> Self {
         Self::NodeList(node_list)
     }
     pub(crate) fn new_bool(value: bool) -> Self {
@@ -644,13 +644,13 @@ impl<'a> ParseValue<'a> {
     pub(crate) fn new_num(value: i32) -> Self {
         Self::Num(value)
     }
-    pub(crate) fn new_maybe_str_term(maybe_str_term: Option<&'a StrTerm<'a>>) -> Self {
+    pub(crate) fn new_maybe_str_term(maybe_str_term: Option<StrTerm<'a>>) -> Self {
         Self::MaybeStrTerm(maybe_str_term)
     }
-    pub(crate) fn new_token(token: &'a mut Token<'a>) -> Self {
+    pub(crate) fn new_token(token: &'a Token<'a>) -> Self {
         Self::Token(token)
     }
-    pub(crate) fn new_token_list(token_list: Vec<'a, &'a mut Token<'a>>) -> Self {
+    pub(crate) fn new_token_list(token_list: Vec<'a, &'a Token<'a>>) -> Self {
         Self::TokenList(token_list)
     }
 }

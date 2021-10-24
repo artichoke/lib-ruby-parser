@@ -15,7 +15,7 @@ pub struct ParserResult<'a> {
 
     /// List of tokens returned by a Lexer and consumed by a Parser.
     /// Empty unless ParserOptions::record_tokens is set to true.
-    pub tokens: bumpalo::collections::Vec<'a, &'a mut Token<'a>>,
+    pub tokens: bumpalo::collections::Vec<'a, &'a Token<'a>>,
 
     /// List of all diagnostics (errors and warings) that have been
     /// recorded during lexing and parsing
@@ -42,7 +42,7 @@ pub struct ParserResult<'a> {
 impl<'a> ParserResult<'a> {
     pub(crate) fn new(
         ast: Option<&'a Node<'a>>,
-        tokens: bumpalo::collections::Vec<'a, &'a mut Token<'a>>,
+        tokens: bumpalo::collections::Vec<'a, &'a Token<'a>>,
         diagnostics: bumpalo::collections::Vec<'a, Diagnostic<'a>>,
         comments: bumpalo::collections::Vec<'a, Comment>,
         magic_comments: bumpalo::collections::Vec<'a, MagicComment>,
@@ -63,7 +63,7 @@ impl<'a> ParserResult<'a> {
         &self.ast
     }
     /// Returns `tokens` attribute
-    pub fn tokens(&self) -> &bumpalo::collections::Vec<'a, &'a mut Token<'a>> {
+    pub fn tokens(&self) -> &bumpalo::collections::Vec<'a, &'a Token<'a>> {
         &self.tokens
     }
     /// Returns `diagnostics` attribute

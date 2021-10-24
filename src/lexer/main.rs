@@ -35,7 +35,7 @@ pub struct Lexer<'a> {
     pub(crate) lval_start: Option<usize>,
     pub(crate) lval_end: Option<usize>,
 
-    pub(crate) strterm: Option<&'a StrTerm<'a>>,
+    pub(crate) strterm: Option<StrTerm<'a>>,
     /// Current state of the lexer, used internally for testing
     pub lex_state: LexState,
     pub(crate) paren_nest: i32,
@@ -140,7 +140,7 @@ impl<'a> Lexer<'a> {
     /// of tokens. It's used internally to test simple inputs.
     ///
     /// If you need to get tokens better use `ParserResult::tokens` field
-    pub fn tokenize_until_eof(&'a mut self) -> Vec<'a, &'a mut Token> {
+    pub fn tokenize_until_eof(&mut self) -> Vec<'a, &'a Token<'a>> {
         let mut tokens = Vec::new_in(self.bump);
 
         loop {
@@ -154,7 +154,7 @@ impl<'a> Lexer<'a> {
         tokens
     }
 
-    pub(crate) fn yylex(&'a mut self) -> &'a mut Token {
+    pub(crate) fn yylex(&mut self) -> &'a Token<'a> {
         let lex_state_before = self.lex_state;
         self.lval = None;
 
@@ -216,7 +216,7 @@ impl<'a> Lexer<'a> {
         let mut last_state: LexState;
         let token_seen = self.token_seen;
 
-        if let Some(strterm) = self.strterm.as_ref().map(|i| *i) {
+        if let Some(strterm) = &self.strterm {
             match strterm {
                 StrTerm::HeredocLiteral(_) => {
                     return self.here_document();
@@ -1171,14 +1171,14 @@ impl<'a> Lexer<'a> {
         term: u8,
         paren: Option<u8>,
         heredoc_end: Option<HeredocEnd<'a>>,
-    ) -> Option<&'a StrTerm<'a>> {
-        Some(self.bump.alloc(StrTerm::new_literal(StringLiteral::new(
+    ) -> Option<StrTerm<'a>> {
+        Some(StrTerm::new_literal(StringLiteral::new(
             0,
             func,
             paren,
             term,
             heredoc_end,
-        ))))
+        )))
     }
 
     pub(crate) fn loc(&self, begin_pos: usize, end_pos: usize) -> Loc {

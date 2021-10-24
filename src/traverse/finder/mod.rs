@@ -18,7 +18,7 @@ impl<'a> Finder<'a> {
     /// `looking_for` is a string slice that is used to construct a `Pattern`.
     pub fn run(
         looking_for: &str,
-        root: &'a mut Node<'a>,
+        root: &'a Node<'a>,
     ) -> Result<Option<&'a Node<'a>>, PatternError> {
         let looking_for = Pattern::new(looking_for)?;
         let mut visitor = Visitor {

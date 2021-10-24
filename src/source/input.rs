@@ -71,7 +71,7 @@ impl<'a> Input<'a> {
         self.decoded.lines().len()
     }
 
-    pub(crate) fn set_encoding(&mut self, encoding: &str) -> Result<(), InputError> {
+    pub(crate) fn set_encoding(&mut self, encoding: &str) -> Result<(), InputError<'a>> {
         let new_input = decode_input(
             self.decoded.take_bytes(),
             String::from_str_in(encoding, self.bump),
@@ -83,7 +83,7 @@ impl<'a> Input<'a> {
     }
 
     /// Returns raw bytes after decoding
-    pub fn as_shared_bytes(&self) -> SharedByteList {
+    pub fn as_shared_bytes(&'a self) -> SharedByteList<'a> {
         self.decoded.as_shared_bytes()
     }
 

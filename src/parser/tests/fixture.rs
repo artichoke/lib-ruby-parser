@@ -1,4 +1,5 @@
 crate::use_native_or_external!(Maybe);
+use bumpalo::Bump;
 
 use crate::test_helpers::{render_diagnostic_for_testing, LocMatcher};
 use crate::{Parser, ParserOptions, ParserResult};
@@ -151,6 +152,7 @@ impl Fixture {
 }
 
 pub(crate) fn test_file(fixture_path: &str) {
+    let bump = Bump::new();
     let fixture = Fixture::new(fixture_path);
 
     if let Some(depends_on_features) = &fixture.depends_on_features {
@@ -170,12 +172,16 @@ pub(crate) fn test_file(fixture_path: &str) {
     }
 
     let options = ParserOptions::new(
-        format!("(test {})", fixture_path).into(),
+        bumpalo::collections::String::from_str_in(&format!("(test {})", fixture_path), &bump),
         Maybe::none(),
         Maybe::none(),
         false,
     );
-    let parser = Parser::new(fixture.input.as_bytes(), options);
+    let parser = Parser::new(
+        &bump,
+        bumpalo::collections::Vec::from_iter_in(fixture.input.as_bytes().iter().cloned(), &bump),
+        options,
+    );
 
     parser.static_env.declare("foo");
     parser.static_env.declare("bar");

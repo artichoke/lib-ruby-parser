@@ -48,20 +48,20 @@ pub(crate) trait Visit<TItem> {
     fn visit(&mut self, item: TItem, visit_as: Item);
 }
 
-impl<'a, TObserver: Observer<'a>> Visit<&'a mut Vec<'a, &'a mut Node<'a>>> for Visitor<TObserver>
+impl<'a, TObserver: Observer<'a>> Visit<&'a Vec<'a, &'a Node<'a>>> for Visitor<TObserver>
 where
     Self: 'a,
 {
-    fn visit(&mut self, nodes: &'a mut Vec<'a, &'a mut Node<'a>>, visit_as: Item) {
+    fn visit(&mut self, nodes: &'a Vec<'a, &'a Node<'a>>, visit_as: Item) {
         self.visit(nodes.as_slice(), visit_as);
     }
 }
 
-impl<'a, TObserver: Observer<'a>> Visit<&'a [&'a mut Node<'a>]> for Visitor<TObserver>
+impl<'a, TObserver: Observer<'a>> Visit<&'a [&'a Node<'a>]> for Visitor<TObserver>
 where
     Self: 'a,
 {
-    fn visit(&mut self, nodes: &'a [&'a mut Node<'a>], visit_as: Item) {
+    fn visit(&mut self, nodes: &'a [&'a Node<'a>], visit_as: Item) {
         self.observer.on_subitem(visit_as);
         self.observer.on_node_list(nodes);
 
@@ -74,21 +74,21 @@ where
     }
 }
 
-// impl<'a, TObserver: Observer<'a>> Visit<&'a Vec<'a, &'a mut Node<'a>>> for Visitor<TObserver>
+// impl<'a, TObserver: Observer<'a>> Visit<&'a Vec<'a, &'a Node<'a>>> for Visitor<TObserver>
 // where
 //     Self: 'a,
 // {
-//     fn visit(&mut self, nodes: &'a Vec<'a, &'a mut Node<'a>>, visit_as: Item) {
-//         let nodes: &'a [&'a mut Node<'a>] = nodes.as_slice();
+//     fn visit(&mut self, nodes: &'a Vec<'a, &'a Node<'a>>, visit_as: Item) {
+//         let nodes: &'a [&'a Node<'a>] = nodes.as_slice();
 //         self.visit(nodes, visit_as);
 //     }
 // }
 
-impl<'a, TObserver: Observer<'a>> Visit<Option<&'a &'a mut Node<'a>>> for Visitor<TObserver>
+impl<'a, TObserver: Observer<'a>> Visit<Option<&'a &'a Node<'a>>> for Visitor<TObserver>
 where
     Self: 'a,
 {
-    fn visit(&mut self, node: Option<&'a &'a mut Node<'a>>, visit_as: Item) {
+    fn visit(&mut self, node: Option<&'a &'a Node<'a>>, visit_as: Item) {
         if let Some(node) = node {
             self.visit(&**node, visit_as);
         }

@@ -47,7 +47,7 @@ impl<'a> DecodedInput<'a> {
     pub(crate) fn lines(&self) -> &Vec<'a, SourceLine> {
         &self.lines
     }
-    pub(crate) fn bytes(&self) -> &Vec<'a, u8> {
+    pub(crate) fn bytes(&'a self) -> &'a Vec<'a, u8> {
         &self.bytes
     }
 

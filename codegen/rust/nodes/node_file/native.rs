@@ -130,9 +130,9 @@ mod local_helpers {
     pub(crate) fn native_field_type(node_with_field: &NodeWithField) -> String {
         use lib_ruby_parser_nodes::NodeFieldType;
         match node_with_field.field.field_type {
-            NodeFieldType::Node => "&'a mut Node<'a>",
-            NodeFieldType::Nodes => "bumpalo::collections::Vec<'a, &'a mut Node<'a>>",
-            NodeFieldType::MaybeNode { .. } => "Option<&'a mut Node<'a>>",
+            NodeFieldType::Node => "&'a Node<'a>",
+            NodeFieldType::Nodes => "bumpalo::collections::Vec<'a, &'a Node<'a>>",
+            NodeFieldType::MaybeNode { .. } => "Option<&'a Node<'a>>",
             NodeFieldType::Loc => "Loc",
             NodeFieldType::MaybeLoc => "Option<Loc>",
             NodeFieldType::Str { .. } => "String<'a>",
@@ -147,8 +147,8 @@ mod local_helpers {
         use lib_ruby_parser_nodes::NodeFieldType;
         match node_with_field.field.field_type {
             NodeFieldType::Node => "&Node<'a>",
-            NodeFieldType::Nodes => "&bumpalo::collections::Vec<'a, &'a mut Node<'a>>",
-            NodeFieldType::MaybeNode { .. } => "&Option<&'a mut Node<'a>>",
+            NodeFieldType::Nodes => "&bumpalo::collections::Vec<'a, &'a Node<'a>>",
+            NodeFieldType::MaybeNode { .. } => "&Option<&'a Node<'a>>",
             NodeFieldType::Loc => "&Loc",
             NodeFieldType::MaybeLoc => "&Option<Loc>",
             NodeFieldType::Str { .. } => "&String<'a>",

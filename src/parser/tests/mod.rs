@@ -1,6 +1,7 @@
 crate::use_native_or_external!(Maybe);
 
 mod fixture;
+use bumpalo::Bump;
 pub(crate) use fixture::test_file;
 
 #[allow(non_snake_case)]
@@ -24,20 +25,29 @@ macro_rules! fixture_file {
 }
 pub(crate) use fixture_file;
 
-fn parse(input: &[u8]) -> ParserResult {
-    let options = ParserOptions::new("(eval)".into(), Maybe::none(), Maybe::none(), false);
-    let parser = Parser::new(input, options);
+fn parse<'a>(bump: &'a Bump, input: &[u8]) -> ParserResult<'a> {
+    let options = ParserOptions::new(
+        bumpalo::collections::String::from_str_in("(eval)", &bump),
+        Maybe::none(),
+        Maybe::none(),
+        false,
+    );
+    let parser = Parser::new(
+        &bump,
+        bumpalo::collections::Vec::from_iter_in(input.iter().cloned(), &bump),
+        options,
+    );
     parser.do_parse()
 }
 
 #[test]
 fn test_magic_comment() {
+    let bump = Bump::new();
     let fixture = std::fs::read("fixtures/magic_comments.rb").unwrap();
-    let result = parse(&fixture);
-    let magic_comments: Vec<MagicComment> = result.magic_comments().to_owned().into();
+    let result = parse(&bump, &fixture);
     assert_eq!(
-        magic_comments,
-        vec![
+        result.magic_comments.as_slice(),
+        &[
             MagicComment::new(
                 MagicCommentKind::encoding(),
                 Loc::new(2, 10),

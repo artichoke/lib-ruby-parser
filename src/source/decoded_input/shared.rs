@@ -64,7 +64,7 @@ impl<'a> DecodedInput<'a> {
     }
 
     /// Returns raw bytes after decoding
-    pub fn as_shared_bytes(&self) -> SharedByteList {
+    pub fn as_shared_bytes(&'a self) -> SharedByteList<'a> {
         self.bytes().as_slice()
     }
 }

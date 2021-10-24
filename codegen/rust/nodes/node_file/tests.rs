@@ -22,17 +22,17 @@ fn new_maybe_loc(bump: &bumpalo::Bump) -> Maybe<Loc> {
 }
 
 #[allow(dead_code)]
-fn new_node<'a>(bump: &'a bumpalo::Bump) -> &'a mut Node<'a> {
+fn new_node<'a>(bump: &'a bumpalo::Bump) -> &'a Node<'a> {
     Node::new_retry(bump, new_loc(bump))
 }
 
 #[allow(dead_code)]
-fn new_node_ptr<'a>(bump: &'a bumpalo::Bump) -> &'a mut Node {
+fn new_node_ptr<'a>(bump: &'a bumpalo::Bump) -> &'a Node {
     new_node(bump)
 }
 
 #[allow(dead_code)]
-fn new_maybe_node_ptr<'a>(bump: &'a bumpalo::Bump) -> Maybe<&'a mut Node> {
+fn new_maybe_node_ptr<'a>(bump: &'a bumpalo::Bump) -> Maybe<&'a Node> {
     Maybe::some(new_node_ptr(bump))
 }
 
@@ -47,7 +47,7 @@ fn new_maybe_string_ptr<'a>(bump: &'a bumpalo::Bump) -> Maybe<String<'a>> {
 }
 
 #[allow(dead_code)]
-fn new_node_list<'a>(bump: &'a bumpalo::Bump) -> Vec<'a, &'a mut Node> {
+fn new_node_list<'a>(bump: &'a bumpalo::Bump) -> Vec<'a, &'a Node> {
     bump_vec![in bump; new_node(bump)]
 }
 
@@ -61,7 +61,7 @@ fn new_bytes<'a>(bump: &'a bumpalo::Bump) -> Bytes<'a> {
     Bytes::new(bump, bump_vec![in bump; 1, 2, 3])
 }
 
-fn new_test_node<'a>(bump: &'a bumpalo::Bump) -> &'a mut Node<'a> {
+fn new_test_node<'a>(bump: &'a bumpalo::Bump) -> &'a Node<'a> {
     Node::new_{{ helper node-lower-name }}(
         bump,
 {{ each node-field }}

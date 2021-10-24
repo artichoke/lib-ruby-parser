@@ -34,7 +34,7 @@ impl<'a> Lexer<'a> {
         ));
     }
 
-    pub(crate) fn set_yylval_str(&mut self, value: &'a TokenBuf) {
+    pub(crate) fn set_yylval_str(&mut self, value: &TokenBuf<'a>) {
         if cfg!(feature = "debug-lexer") {
             println!("set_yylval_str {:#?}", value);
         }

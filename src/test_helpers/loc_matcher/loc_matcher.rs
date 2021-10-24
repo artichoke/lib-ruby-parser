@@ -75,7 +75,7 @@ impl LocMatcher {
         }
     }
 
-    pub fn test<'a>(&self, root: &'a mut Node<'a>) -> Result<(), String> {
+    pub fn test<'a>(&self, root: &'a Node<'a>) -> Result<(), String> {
         match Finder::run(&self.pattern, root).unwrap() {
             Some(node) => match self.loc_name.get(&node).as_ref() {
                 Some(loc) => {

@@ -25,11 +25,11 @@ pub trait Observer<'a> {
 
     /// Called when entering any optional `Node`
     #[allow(unused_variables)]
-    fn on_option_node(&mut self, node: &Option<&'a mut Node<'a>>) {}
+    fn on_option_node(&mut self, node: &Option<&'a Node<'a>>) {}
 
     /// Called when entering any `Vec<Node>`
     #[allow(unused_variables)]
-    fn on_node_list(&mut self, nodes: &'a [&'a mut Node<'a>]) {}
+    fn on_node_list(&mut self, nodes: &'a [&'a Node<'a>]) {}
 
     /// Called when entering any AST node,
     /// `subitem` is different for different `Node` fields,
