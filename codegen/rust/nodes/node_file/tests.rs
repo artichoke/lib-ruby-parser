@@ -58,7 +58,7 @@ fn new_u8(_: &bumpalo::Bump) -> u8 {
 
 #[allow(dead_code)]
 fn new_bytes<'a>(bump: &'a bumpalo::Bump) -> Bytes<'a> {
-    Bytes::new(bump_vec![in bump; 1, 2, 3])
+    Bytes::new(bump, bump_vec![in bump; 1, 2, 3])
 }
 
 fn new_test_node<'a>(bump: &'a bumpalo::Bump) -> &'a mut Node<'a> {

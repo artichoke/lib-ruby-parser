@@ -1,7 +1,11 @@
+use bumpalo::Bump;
+
 /// Representation of a byte sequence
 #[derive(Clone)]
 #[repr(C)]
 pub struct Bytes<'a> {
+    pub(crate) bump: &'a Bump,
+
     /// Raw vector of bytes
     pub raw: bumpalo::collections::Vec<'a, u8>,
 }
@@ -28,8 +32,8 @@ impl std::fmt::Debug for Bytes<'_> {
 
 impl<'a> Bytes<'a> {
     /// Constructs Bytes based on a given vector
-    pub fn new(raw: bumpalo::collections::Vec<'a, u8>) -> Bytes<'a> {
-        Self { raw }
+    pub fn new(bump: &'a Bump, raw: bumpalo::collections::Vec<'a, u8>) -> Bytes<'a> {
+        Self { bump, raw }
     }
 
     pub(crate) fn prepend(&mut self, part: &[u8]) {
@@ -62,6 +66,7 @@ impl<'a> Bytes<'a> {
     pub(crate) fn take(&mut self) -> Self {
         Self {
             raw: self.raw.split_off(0),
+            bump: self.bump,
         }
     }
 }

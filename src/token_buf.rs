@@ -11,7 +11,7 @@ pub(crate) struct TokenBuf<'a> {
 impl<'a> TokenBuf<'a> {
     pub(crate) fn new(bump: &'a Bump, bytes: &[u8]) -> Self {
         Self {
-            bytes: Bytes::new(Vec::from_iter_in(bytes.iter().cloned(), bump)),
+            bytes: Bytes::new(bump, Vec::from_iter_in(bytes.iter().cloned(), bump)),
         }
     }
 
@@ -55,7 +55,7 @@ impl<'a> TokenBuf<'a> {
 
     pub(crate) fn default(bump: &'a Bump) -> Self {
         Self {
-            bytes: Bytes::new(Vec::new_in(bump)),
+            bytes: Bytes::new(bump, Vec::new_in(bump)),
         }
     }
 }

@@ -34,7 +34,7 @@ impl<'a> Token<'a> {
     }
 
     /// Converts token to a string, replaces unknown chars to `U+FFFD`
-    pub fn to_string_lossy(&self) -> std::string::String {
+    pub fn to_string_lossy(&self) -> String {
         self.token_value().to_string_lossy()
     }
 
@@ -43,12 +43,12 @@ impl<'a> Token<'a> {
         self.token_value().to_string()
     }
 
-    // /// Consumes a token and converts it into a string
-    // pub fn into_string(
-    //     self,
-    // ) -> Result<String<'a>, bumpalo::collections::string::FromUtf8Error<'a>> {
-    //     self.into_token_value().into_string()
-    // }
+    /// Consumes a token and converts it into a string
+    pub fn into_string(
+        &mut self,
+    ) -> Result<String<'a>, bumpalo::collections::string::FromUtf8Error<'a>> {
+        self.token_value.into_string()
+    }
 
     /// Returns name of the token
     pub fn token_name(&self) -> &'static str {

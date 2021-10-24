@@ -10,7 +10,7 @@ use super::Bytes;
 impl<'a> Bytes<'a> {
     /// Constructs an empty instance of `Bytes`
     pub fn empty(bump: &'a Bump) -> Bytes<'a> {
-        Self::new(Vec::new_in(bump))
+        Self::new(bump, Vec::new_in(bump))
     }
 
     /// Converts byte sequence to a string slice, returns error if there are invalid UTF-8 chars
@@ -19,22 +19,20 @@ impl<'a> Bytes<'a> {
     }
 
     /// Converts byte sequnce to a string, all invalid UTF-8 chars are converted into "replacement char"
-    pub fn to_string_lossy(&self) -> std::string::String {
-        std::string::String::from_utf8_lossy(self.as_raw()).into_owned()
-        // todo!()
+    pub fn to_string_lossy(&self) -> String<'a> {
+        String::from_utf8_lossy_in(self.as_raw(), self.bump)
     }
 
     /// Converts byte sequence to a String, returns error if there are invalid UTF-8 chars
     pub fn to_string(&self) -> Result<String<'a>, bumpalo::collections::string::FromUtf8Error> {
-        // String::from_utf8(self.raw)
-        todo!()
+        String::from_utf8(self.raw.clone())
     }
 
     /// Consumes itself and convrters it into a string, returns error if there are invalid UTF-8 chars
     pub fn into_string(
-        self,
+        &mut self,
     ) -> Result<String<'a>, bumpalo::collections::string::FromUtf8Error<'a>> {
-        String::from_utf8(self.raw)
+        String::from_utf8(self.raw.split_off(0))
     }
 
     /// Returns `true` if `self` represents a valid UTF-8 string

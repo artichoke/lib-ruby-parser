@@ -13,7 +13,7 @@ fn new_token<'a>(bump: &'a Bump) -> Token<'a> {
     Token::new(
         bump,
         1,
-        Bytes::new(bump_vec![in &bump; 1, 2, 3]),
+        Bytes::new(bump, bump_vec![in &bump; 1, 2, 3]),
         Loc::new(1, 2),
         lex_state(1),
         lex_state(2),
@@ -40,7 +40,7 @@ fn test_token_value() {
     let token = new_token(&bump);
     assert_eq!(
         token.token_value(),
-        &Bytes::new(bump_vec![in &bump; 1, 2, 3])
+        &Bytes::new(&bump, bump_vec![in &bump; 1, 2, 3])
     );
 }
 
@@ -49,11 +49,11 @@ fn test_set_token_value() {
     let bump = Bump::new();
     let mut token = new_token(&bump);
     {
-        token.set_token_value(Bytes::new(bump_vec![in &bump; 4, 5, 6]));
+        token.set_token_value(Bytes::new(&bump, bump_vec![in &bump; 4, 5, 6]));
     }
     assert_eq!(
         token.token_value(),
-        &Bytes::new(bump_vec![in &bump; 4, 5, 6])
+        &Bytes::new(&bump, bump_vec![in &bump; 4, 5, 6])
     );
 }
 
@@ -63,7 +63,7 @@ fn test_set_token_value() {
 //     let token = new_token(&bump);
 //     assert_eq!(
 //         token.into_token_value(),
-//         Bytes::new( bump_vec![in &bump; 1, 2, 3])
+//         Bytes::new(bump,  bump_vec![in &bump; 1, 2, 3])
 //     );
 // }
 

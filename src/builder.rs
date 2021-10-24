@@ -451,7 +451,10 @@ impl<'a> Builder<'a> {
                 i += 1;
             }
 
-            Bytes::new(Vec::from_iter_in(s.as_raw()[i..].iter().cloned(), bump))
+            Bytes::new(
+                bump,
+                Vec::from_iter_in(s.as_raw()[i..].iter().cloned(), bump),
+            )
         }
 
         fn dedent_heredoc_parts<'a>(
@@ -3870,18 +3873,16 @@ pub(crate) fn collection_expr<'a>(nodes: &[&'a mut Node<'a>]) -> Maybe<Loc> {
     join_maybe_exprs(&first, &last)
 }
 
-pub(crate) fn value<'a>(token: &'a Token<'a>) -> String<'a> {
-    token.to_string().unwrap()
+pub(crate) fn value<'a>(token: &'a mut Token<'a>) -> String<'a> {
+    token.into_string().unwrap()
 }
 
-pub(crate) fn lossy_value<'a>(token: &Token<'a>) -> String<'a> {
-    // token.to_string_lossy()
-    todo!()
+pub(crate) fn lossy_value<'a>(token: &'a Token<'a>) -> String<'a> {
+    token.to_string_lossy()
 }
 
-pub(crate) fn clone_value<'a>(token: &Token<'a>) -> String<'a> {
-    // token.to_string_lossy()
-    todo!()
+pub(crate) fn clone_value<'a>(token: &'a Token<'a>) -> String<'a> {
+    token.to_string().unwrap().clone()
 }
 
 pub(crate) fn maybe_value<'a>(token: Maybe<&'a mut Token<'a>>) -> Maybe<String<'a>> {
