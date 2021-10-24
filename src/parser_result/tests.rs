@@ -54,6 +54,7 @@ fn input<'a>(bump: &'a bumpalo::Bump) -> DecodedInput<'a> {
 
 fn parser_options<'a>(bump: &'a bumpalo::Bump) -> ParserResult<'a> {
     ParserResult::new(
+        bump,
         ast(bump),
         tokens(bump),
         diagnostics(bump),

@@ -1,4 +1,5 @@
 extern crate clap;
+use bumpalo::Bump;
 use clap::Clap;
 
 #[allow(dead_code)]
@@ -27,7 +28,8 @@ pub(crate) fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let callback = if args.quiet { print_nothing } else { print_all };
 
-    let files = InputFiles::new(&args.code_to_eval, &args.pattern, &None);
+    let bump = Bump::new();
+    let files = InputFiles::new(&bump, &args.code_to_eval, &args.pattern, &None);
 
     for file in files.into_iter() {
         let tokens = tokenize(file)?;

@@ -6930,6 +6930,7 @@ impl<'a /*'*/> Parser<'a /*'*/> {
         self.parse();
 
         ParserResult::new(
+            self.bump,
             self.result,
             self.tokens,
             self.diagnostics.take_inner(),
@@ -6946,6 +6947,7 @@ impl<'a /*'*/> Parser<'a /*'*/> {
         self.assert_state_is_final();
 
         ParserResult::new(
+            self.bump,
             self.result,
             self.tokens,
             self.diagnostics.take_inner(),

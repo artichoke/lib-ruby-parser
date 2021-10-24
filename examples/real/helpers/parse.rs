@@ -13,11 +13,6 @@ use lib_ruby_parser::containers::helpers::MaybeAPI;
 
 #[allow(dead_code)]
 pub(crate) fn parse(input: InputFile, drop_tokens: bool) -> ParserResult {
-    let options = ParserOptions::new(
-        input.filepath.into(),
-        Maybe::none(),
-        Maybe::none(),
-        !drop_tokens,
-    );
-    Parser::new(input.code, options).do_parse()
+    let options = ParserOptions::new(input.filepath, Maybe::none(), Maybe::none(), !drop_tokens);
+    Parser::new(input.bump, input.code, options).do_parse()
 }

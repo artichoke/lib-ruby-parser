@@ -1,6 +1,7 @@
 use super::helpers::*;
 
 extern crate clap;
+use bumpalo::Bump;
 use clap::Clap;
 
 extern crate jemallocator;
@@ -34,17 +35,17 @@ struct Args {
     repeat: Option<usize>,
 }
 
-impl From<&Args> for Option<InputFiles> {
-    fn from(args: &Args) -> Self {
-        if let Some(code_to_eval) = &args.code_to_eval {
-            Some(InputFiles::new_eval(code_to_eval.clone().into_bytes()))
-        } else if let Some(pattern) = &args.pattern {
-            Some(InputFiles::new_pattern(&pattern))
-        } else {
-            None
-        }
-    }
-}
+// impl From<&Args> for Option<InputFiles<'_>> {
+//     fn from(args: &Args) -> Self {
+//         if let Some(code_to_eval) = &args.code_to_eval {
+//             Some(InputFiles::new_eval(code_to_eval.clone().into_bytes()))
+//         } else if let Some(pattern) = &args.pattern {
+//             Some(InputFiles::new_pattern(&pattern))
+//         } else {
+//             None
+//         }
+//     }
+// }
 
 #[allow(dead_code)]
 pub(crate) fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,8 +56,9 @@ pub(crate) fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let printer = args.printer.unwrap_or_default();
+    let bump = Bump::new();
 
-    let files = InputFiles::new(&args.code_to_eval, &args.pattern, &args.repeat);
+    let files = InputFiles::new(&bump, &args.code_to_eval, &args.pattern, &args.repeat);
     let files_count = files.len();
 
     let mut profiler = args.profiler.unwrap_or_default();

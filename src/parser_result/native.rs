@@ -1,3 +1,5 @@
+use bumpalo::Bump;
+
 use crate::source::Comment;
 use crate::source::DecodedInput;
 use crate::source::MagicComment;
@@ -9,6 +11,9 @@ use crate::Token;
 #[derive(Debug)]
 #[repr(C)]
 pub struct ParserResult<'a> {
+    /// Bump that was used for allocations
+    pub bump: &'a Bump,
+
     /// Abstract Syntax Tree that was constructed from you code.
     /// Contains `None` if the code gives no AST nodes
     pub ast: Option<&'a Node<'a>>,
@@ -41,6 +46,7 @@ pub struct ParserResult<'a> {
 
 impl<'a> ParserResult<'a> {
     pub(crate) fn new(
+        bump: &'a Bump,
         ast: Option<&'a Node<'a>>,
         tokens: bumpalo::collections::Vec<'a, &'a Token<'a>>,
         diagnostics: bumpalo::collections::Vec<'a, Diagnostic<'a>>,
@@ -49,6 +55,7 @@ impl<'a> ParserResult<'a> {
         input: DecodedInput<'a>,
     ) -> Self {
         Self {
+            bump,
             ast,
             tokens,
             diagnostics,

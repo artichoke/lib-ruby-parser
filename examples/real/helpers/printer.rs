@@ -18,7 +18,7 @@ mod formatters {
         for d in result.diagnostics().iter() {
             println!(
                 "{}",
-                d.render(result.input())
+                d.render(result.bump, result.input())
                     .expect("Failed to render a diagnostic")
             )
         }

@@ -7,15 +7,15 @@ type StringPtr = ExternalStringPtr;
 #[cfg(not(feature = "compile-with-external-structures"))]
 type StringPtr = String;
 
-pub(crate) struct TokenList {
-    pub(crate) tokens: Vec<Token>,
+pub(crate) struct TokenList<'a> {
+    pub(crate) tokens: bumpalo::collections::Vec<'a, &'a Token<'a>>,
 }
 
-fn token_value(token: &Token) -> StringPtr {
+fn token_value<'a>(token: &'a Token<'a>) -> bumpalo::collections::String<'a> {
     token.to_string_lossy()
 }
 
-impl TokenList {
+impl<'a> TokenList<'a> {
     fn tok_name_length(&self) -> usize {
         self.tokens
             .iter()
@@ -39,7 +39,7 @@ fn rpad<T: Sized + std::fmt::Debug>(value: &T, total_width: usize) -> String {
     format!("{:width$}", format!("{:?}, ", value), width = total_width)
 }
 
-impl std::fmt::Debug for TokenList {
+impl std::fmt::Debug for TokenList<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let tok_name_length = self.tok_name_length();
         let tok_value_length = self.tok_value_length();
